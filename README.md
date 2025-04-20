@@ -1,2 +1,2 @@
-# Habitus WeeklyPlannerApp
+# HabitusWeeklyPlannerApp
 Weekly Planner Tool
