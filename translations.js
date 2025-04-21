@@ -1,4 +1,3 @@
-
 function applyTranslations(lang) {
   const t = translations[lang] || translations["es"];
 
