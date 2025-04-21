@@ -544,14 +544,14 @@
       
       // Solo mostrar alerta si el campo está vacío
       if(newRole === "") {
-        alert("Por favor ingrese un nombre de rol.");
+        alert(translations[lang]["add_role_error"]);
         return;
       }
       
       // Evitar duplicados (ignorando mayúsculas/minúsculas)
       const exists = roles.some(r => r.toLowerCase() === newRole.toLowerCase());
       if(exists) {
-        alert("Ese rol ya existe.");
+        alert(translations[lang]["duplicate_role_error"]);
         return;
       }
       
@@ -573,15 +573,15 @@
       const quadrant = parseInt(quadrantSelect.value);
 
       if(name === "") {
-        alert("Por favor ingresa la descripción de la tarea.");
+        alert(translations[lang]["missing_task_description"]);
         return;
       }
       if(!role) {
-        alert("Selecciona un rol para la tarea.");
+        alert(translations[lang]["missing_task_role"]);
         return;
       }
       if(isNaN(quadrant)) {
-        alert("Selecciona un cuadrante (prioridad) para la tarea.");
+        alert(translations[lang]["missing_task_quadrant"]);
         return;
       }
       // Crear objeto tarea
@@ -620,7 +620,7 @@
     function deleteTask(index) {
       if(index < 0 || index >= tasks.length) return;
       const task = tasks[index];
-      if(!confirm("¿Estás seguro que deseas eliminar esta tarea?")) return;
+      if(!confirm(translations[lang]["confirm_delete_task"])) return;
       task.completado = 'ELIMINADO';
       task.completedDate = new Date().toISOString();
       localStorage.setItem("habitus_tasks", JSON.stringify(tasks));
@@ -666,7 +666,7 @@
       const todayDateStr = now.toISOString().slice(0,10); // formato "YYYY-MM-DD"
       // 1. Solo una vez por día
       if(localStorage.getItem("habitus_lastResetDate") === todayDateStr) {
-        alert("⚠️ Ya iniciaste una nueva semana hoy. Se sobrescribirá la información anterior con los últimos cambios.");
+        alert(translations[lang]["warning_already_reset_today"]);
         // Eliminar registro anterior de métricas del mismo día
         metrics = metrics.filter(m => !m.fecha.startsWith(now.toLocaleDateString('es-ES')));
         // Eliminar registros anteriores del mismo día del log de tareas
@@ -677,7 +677,7 @@
       if(lastResetTime) {
         const diffDays = (now.getTime() - lastResetTime) / (1000*60*60*24);
         if(diffDays < 7) {
-          const confirmEarly = confirm("Han pasado menos de 7 días desde el último reinicio. ¿Estás seguro que deseas comenzar una nueva semana?");
+          const confirmEarly = confirm(translations[lang]["early_reset_warning"]);
           if(!confirmEarly) {
             return;
           }
