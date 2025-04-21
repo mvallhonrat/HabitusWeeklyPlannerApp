@@ -1,3 +1,28 @@
+function applyTranslations(lang) {
+  const t = translations[lang] || translations["es"]; // Fallback to Spanish if language not found
+
+  // Update text content for elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.value = t[key];
+      }
+
+function setLanguage(lang) {
+  localStorage.setItem("habitus_lang", lang);
+  
+  // Force a complete refresh of all translations
+  const t = translations[lang] || translations["es"];
+  
+  // Update all elements with data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.value = t[key];
+      }
+
 const translations = {
   "es": {
     "title": "Planificador Semanal",
@@ -45,16 +70,7 @@ const translations = {
     "placeholder_role": "Nuevo rol...",
     "placeholder_task": "Descripción de la tarea",
     "metric_completed": "Completadas",
-    "metric_pending": "Pendientes",
-    "confirm_delete_task": "¿Estás seguro que deseas eliminar esta tarea?",
-    "confirm_new_week": "¿Estás seguro que deseas comenzar una nueva semana?",
-    "warning_already_reset_today": "⚠️ Ya iniciaste una nueva semana hoy. Se sobrescribirá la información anterior con los últimos cambios.",
-    "early_reset_warning": "Han pasado menos de 7 días desde el último reinicio. ¿Estás seguro que deseas comenzar una nueva semana?",
-    "add_role_error": "Por favor ingrese un nombre de rol.",
-    "duplicate_role_error": "Ese rol ya existe.",
-    "missing_task_description": "Por favor ingresa la descripción de la tarea.",
-    "missing_task_role": "Selecciona un rol para la tarea.",
-    "missing_task_quadrant": "Selecciona un cuadrante (prioridad) para la tarea."
+    "metric_pending": "Pendientes"
   },
   "en": {
     "title": "Weekly Planner",
@@ -102,15 +118,6 @@ const translations = {
     "placeholder_role": "New role...",
     "placeholder_task": "Task description",
     "metric_completed": "Completed",
-    "metric_pending": "Pending",
-    "confirm_delete_task": "Are you sure you want to delete this task?",
-    "confirm_new_week": "Are you sure you want to start a new week?",
-    "warning_already_reset_today": "⚠️ You've already started a new week today. The previous data will be overwritten.",
-    "early_reset_warning": "Less than 7 days have passed since the last reset. Are you sure you want to start a new week?",
-    "add_role_error": "Please enter a role name.",
-    "duplicate_role_error": "That role already exists.",
-    "missing_task_description": "Please enter the task description.",
-    "missing_task_role": "Please select a role for the task.",
-    "missing_task_quadrant": "Please select a priority quadrant for the task."
+    "metric_pending": "Pending"
   }
 };
