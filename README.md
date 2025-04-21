@@ -1,2 +1,0 @@
-# HabitusWeeklyPlannerApp
-Weekly Planner Tool
