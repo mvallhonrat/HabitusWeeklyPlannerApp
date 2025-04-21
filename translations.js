@@ -1,27 +1,28 @@
-function applyTranslations(lang) {
-  const t = translations[lang] || translations["es"]; // Fallback to Spanish if language not found
 
-  // Update text content for elements with data-i18n attribute
+function applyTranslations(lang) {
+  const t = translations[lang] || translations["es"];
+
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        el.value = t[key];
+        el.placeholder = t[key];
+      } else {
+        el.innerHTML = t[key];
       }
+    }
+  });
+}
 
 function setLanguage(lang) {
   localStorage.setItem("habitus_lang", lang);
-  
-  // Force a complete refresh of all translations
-  const t = translations[lang] || translations["es"];
-  
-  // Update all elements with data-i18n
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key]) {
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        el.value = t[key];
-      }
+  applyTranslations(lang);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const lang = localStorage.getItem("habitus_lang") || "es";
+  setLanguage(lang);
+});
 
 const translations = {
   "es": {
