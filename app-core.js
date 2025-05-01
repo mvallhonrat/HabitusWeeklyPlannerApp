@@ -887,7 +887,7 @@
     }
 
     // === Función para migrar datos existentes ===
-    function migrateExistingData() {
+    window.migrateExistingData = function() {
       try {
         // Get current language
         const currentLanguage = localStorage.getItem("habitus_lang") || "es";
@@ -1001,10 +1001,7 @@
         const currentLanguage = localStorage.getItem("habitus_lang") || "es";
         alert(currentLanguage === 'es' ? 'Error durante la migración' : 'Error during migration');
       }
-    }
-
-    // Make sure the function is available globally
-    window.migrateExistingData = migrateExistingData;
+    };
 
     // === Inicializar la aplicación al cargar la página ===
     document.addEventListener('DOMContentLoaded', () => {
