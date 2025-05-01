@@ -244,7 +244,7 @@
 </div>
 <!-- Botón de migración -->
 <div class="mb-4">
-  <button class="bg-blue-500 text-white text-sm px-4 py-3 rounded hover:bg-blue-600 active:bg-blue-700 w-full touch-manipulation" onclick="migrateExistingData()">
+  <button id="migrateDataBtn" class="bg-blue-500 text-white text-sm px-4 py-3 rounded hover:bg-blue-600 active:bg-blue-700 w-full touch-manipulation">
     🔄 Migrar Datos Existentes
   </button>
 </div>
@@ -1409,5 +1409,28 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="dom.js"></script>
 <script src="charts.js"></script>
 <script src="app-core.js"></script>
+<script>
+// Ensure migrateExistingData is available globally
+if (typeof migrateExistingData !== 'function') {
+  console.error('migrateExistingData function is not available');
+}
+
+// Add event listener to migration button
+document.addEventListener('DOMContentLoaded', () => {
+  const migrateBtn = document.getElementById('migrateDataBtn');
+  if (migrateBtn) {
+    migrateBtn.addEventListener('click', () => {
+      console.log('Migration button clicked');
+      if (typeof migrateExistingData === 'function') {
+        migrateExistingData();
+      } else {
+        console.error('migrateExistingData is not a function');
+      }
+    });
+  } else {
+    console.error('Migration button not found');
+  }
+});
+</script>
 </body>
 </html>
