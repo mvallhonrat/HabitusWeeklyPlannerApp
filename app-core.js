@@ -111,4 +111,32 @@ document.addEventListener("DOMContentLoaded", function () {
     console.error("Error al cargar el versículo:", error);
   }
 });
+function mostrarVersiculoAleatorio(idiomaSeleccionado) {
+  const idioma = idiomaSeleccionado || localStorage.getItem("lang") || "es";
+  const pasajesDisponibles = pasajes[idioma] || pasajes["es"];
+  const versiculoAleatorio = pasajesDisponibles[Math.floor(Math.random() * pasajesDisponibles.length)];
+
+  const contenedor = document.getElementById("verso-contenedor");
+  if (contenedor && versiculoAleatorio) {
+    contenedor.innerHTML = `
+      <p class="italic text-lg mb-1">"${versiculoAleatorio.contenido}"</p>
+      <p class="font-semibold text-sm text-gray-600">${versiculoAleatorio.pasaje}</p>
+    `;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  mostrarVersiculoAleatorio();
+
+  document.getElementById("btn-es")?.addEventListener("click", () => {
+    localStorage.setItem("lang", "es");
+    mostrarVersiculoAleatorio("es");
+  });
+
+  document.getElementById("btn-en")?.addEventListener("click", () => {
+    localStorage.setItem("lang", "en");
+    mostrarVersiculoAleatorio("en");
+  });
+});
+
 
