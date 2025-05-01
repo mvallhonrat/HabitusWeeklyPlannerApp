@@ -887,8 +887,11 @@
     }
 
     // === Función para migrar datos existentes ===
-    window.migrateExistingData = function() {
+    function migrateExistingData() {
       try {
+        // Get current language
+        const currentLanguage = localStorage.getItem("habitus_lang") || "es";
+        
         // Get existing data from localStorage with correct keys
         const storedMetrics = localStorage.getItem('habitus_metrics');
         const storedTasks = localStorage.getItem('habitus_tasks');
@@ -995,9 +998,13 @@
         }
       } catch (error) {
         console.error('Error during migration:', error);
+        const currentLanguage = localStorage.getItem("habitus_lang") || "es";
         alert(currentLanguage === 'es' ? 'Error durante la migración' : 'Error during migration');
       }
-    };
+    }
+
+    // Attach the function to the window object
+    window.migrateExistingData = migrateExistingData;
 
     // === Inicializar la aplicación al cargar la página ===
     document.addEventListener('DOMContentLoaded', () => {
