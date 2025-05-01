@@ -28,7 +28,11 @@
 <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-1" data-i18n="title">Planificador Semanal</h1>
 </div>
 </div>
-<div class="mb-6" id="pasaje-inspirador"></div>
+<div class="mb-6" id="pasaje-inspirador">
+<div class="text-gray-700 text-center mt-2">
+<p class="italic mb-1">" Confía en el Señor con todo tu corazón, y no te apoyes en tu propio entendimiento."</p>
+<p class="text-sm text-gray-500">Proverbios 3:5</p>
+</div>
 </div></div><script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
 <link href="manifest.json" rel="manifest"/>
@@ -1394,21 +1398,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // ... rest of your existing DOMContentLoaded code ...
 });
 </script>
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const lang = localStorage.getItem("habitus_lang") || "es";
-  const verse = pasajes[lang][Math.floor(Math.random() * pasajes[lang].length)];
-  const container = document.getElementById("pasaje-inspirador");
-  if (container && verse) {
-    container.innerHTML = `
-      <div class="text-gray-700 text-center mt-2">
-        <p class="italic mb-1">"${verse.contenido}"</p>
-        <p class="text-sm text-gray-500">${verse.pasaje}</p>
-      </div>`;
-  }
-});
-</script>
-
 </body>
 </html>
