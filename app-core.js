@@ -93,3 +93,22 @@ function migrateExistingData() {
     alert(currentLanguage === "es" ? "❌ Error al migrar los datos." : "❌ Error during data migration.");
   }
 }
+// Mostrar versículo aleatorio desde pasajes_bilingues.js
+document.addEventListener("DOMContentLoaded", function () {
+  try {
+    const idioma = localStorage.getItem("lang") || "es"; // usa el idioma guardado o español por defecto
+    const pasajesDisponibles = pasajes[idioma] || pasajes["es"]; // fallback a español si no existe
+    const versiculoAleatorio = pasajesDisponibles[Math.floor(Math.random() * pasajesDisponibles.length)];
+
+    const contenedor = document.getElementById("verso-contenedor");
+    if (contenedor && versiculoAleatorio) {
+      contenedor.innerHTML = `
+        <p class="italic text-lg mb-1">"${versiculoAleatorio.contenido}"</p>
+        <p class="font-semibold text-sm text-gray-600">${versiculoAleatorio.pasaje}</p>
+      `;
+    }
+  } catch (error) {
+    console.error("Error al cargar el versículo:", error);
+  }
+});
+
