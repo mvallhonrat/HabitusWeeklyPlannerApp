@@ -1,3 +1,11 @@
+
+function parseDateFromString(fechaStr) {
+  const [fecha, hora] = fechaStr.split(" ");
+  const [dia, mes, anio] = fecha.split("/");
+  return new Date(`${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}T${hora}`);
+}
+
+
 const translations = {
   "es": {
     "title": "Planificador Semanal",
