@@ -273,7 +273,12 @@
             labels.push(invalidDateMsg);
           }
           
-          completionPercentages.push(parseInt(metric.porcentaje) || 0);
+          // Remove % symbol if present and parse as integer
+          const porcentaje = typeof metric.porcentaje === 'string' ? 
+            parseInt(metric.porcentaje.replace('%', '')) : 
+            parseInt(metric.porcentaje);
+            
+          completionPercentages.push(porcentaje || 0);
           q1Counts.push(metric.q1 || 0);
           q2Counts.push(metric.q2 || 0);
           q3Counts.push(metric.q3 || 0);
@@ -724,11 +729,11 @@
       const reviewText = document.getElementById("reviewInput").value.trim();
       // Crear registro de métricas
       const metricsEntry = {
-        fecha: now.toISOString(),  // fecha actual formateada
+        fecha: now.toISOString(),  // Store in ISO format
         totales: totalTasks,
         completadas: completedCount,
         pendientes: pendingCount,
-        porcentaje: percent + "%",
+        porcentaje: percent,
         q1: quadCounts[0],
         q2: quadCounts[1],
         q3: quadCounts[2],
@@ -879,6 +884,119 @@
       // Actualizar vistas
       updateRoleOptions();
       renderViews();
+    }
+
+    // === Función para migrar datos existentes ===
+    function migrateExistingData() {
+      try {
+        // Get existing data from localStorage with correct keys
+        const storedMetrics = localStorage.getItem('habitus_metrics');
+        const storedTasks = localStorage.getItem('habitus_tasks');
+        const storedTasksLog = localStorage.getItem('habitus_tasksLog');
+
+        let hasChanges = false;
+
+        // Migrate metrics
+        if (storedMetrics) {
+          const metrics = JSON.parse(storedMetrics);
+          const updatedMetrics = metrics.map(metric => {
+            if (metric.fecha && !metric.fecha.includes('T')) {
+              try {
+                const date = new Date(metric.fecha);
+                if (!isNaN(date.getTime())) {
+                  metric.fecha = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating metric date:', e);
+              }
+            }
+            return metric;
+          });
+          if (hasChanges) {
+            localStorage.setItem('habitus_metrics', JSON.stringify(updatedMetrics));
+          }
+        }
+
+        // Migrate tasks
+        if (storedTasks) {
+          const tasks = JSON.parse(storedTasks);
+          const updatedTasks = tasks.map(task => {
+            if (task.createdDate && !task.createdDate.includes('T')) {
+              try {
+                const date = new Date(task.createdDate);
+                if (!isNaN(date.getTime())) {
+                  task.createdDate = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task createdDate:', e);
+              }
+            }
+            if (task.completedDate && !task.completedDate.includes('T')) {
+              try {
+                const date = new Date(task.completedDate);
+                if (!isNaN(date.getTime())) {
+                  task.completedDate = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task completedDate:', e);
+              }
+            }
+            return task;
+          });
+          if (hasChanges) {
+            localStorage.setItem('habitus_tasks', JSON.stringify(updatedTasks));
+          }
+        }
+
+        // Migrate tasks log
+        if (storedTasksLog) {
+          const tasksLog = JSON.parse(storedTasksLog);
+          const updatedTasksLog = tasksLog.map(log => {
+            if (log.fechaCreacion && !log.fechaCreacion.includes('T')) {
+              try {
+                const date = new Date(log.fechaCreacion);
+                if (!isNaN(date.getTime())) {
+                  log.fechaCreacion = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task log fechaCreacion:', e);
+              }
+            }
+            if (log.fechaFin && !log.fechaFin.includes('T')) {
+              try {
+                const date = new Date(log.fechaFin);
+                if (!isNaN(date.getTime())) {
+                  log.fechaFin = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task log fechaFin:', e);
+              }
+            }
+            return log;
+          });
+          if (hasChanges) {
+            localStorage.setItem('habitus_tasksLog', JSON.stringify(updatedTasksLog));
+          }
+        }
+
+        if (hasChanges) {
+          // Reload data and refresh views
+          loadData();
+          renderViews();
+          initCharts();
+          alert(currentLanguage === 'es' ? 'Datos migrados exitosamente' : 'Data migrated successfully');
+        } else {
+          alert(currentLanguage === 'es' ? 'No se encontraron datos para migrar' : 'No data found to migrate');
+        }
+      } catch (error) {
+        console.error('Error during migration:', error);
+        alert(currentLanguage === 'es' ? 'Error durante la migración' : 'Error during migration');
+      }
     }
 
     // === Inicializar la aplicación al cargar la página ===
