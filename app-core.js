@@ -1003,7 +1003,7 @@
       }
     }
 
-    // Attach the function to the window object
+    // Make sure the function is available globally
     window.migrateExistingData = migrateExistingData;
 
     // === Inicializar la aplicación al cargar la página ===
