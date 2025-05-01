@@ -264,3 +264,132 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // ... rest of your existing DOMContentLoaded code ...
 });
+
+
+// === charts.js: Renderiza los gráficos de métricas históricas ===
+
+// Extrae métricas del localStorage
+const metricsData = JSON.parse(localStorage.getItem("habitus_metrics")) || [];
+
+// Crea etiquetas de fecha compatibles con Chart.js
+function parseISODate(fechaISO) {
+  return new Date(fechaISO);
+}
+
+// === Gráfico: Porcentaje de completado por semana ===
+const percentCtx = document.getElementById("chart_percent").getContext("2d");
+new Chart(percentCtx, {
+  type: "line",
+  data: {
+    labels: metricsData.map(entry => parseISODate(entry.fecha)),
+    datasets: [{
+      label: "Porcentaje Completado",
+      data: metricsData.map(entry => parseInt(entry.porcentaje)),
+      backgroundColor: "#4ade80",
+      borderColor: "#16a34a",
+      fill: true,
+      tension: 0.3
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: {
+        type: "time",
+        time: {
+          unit: "week",
+          tooltipFormat: "dd/MM/yyyy"
+        },
+        title: {
+          display: true,
+          text: "Semana"
+        }
+      },
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: { stepSize: 20 }
+      }
+    }
+  }
+});
+
+// === Gráfico: Tareas por cuadrante ===
+const quadCtx = document.getElementById("chart_quadrants").getContext("2d");
+new Chart(quadCtx, {
+  type: "bar",
+  data: {
+    labels: metricsData.map(entry => parseISODate(entry.fecha)),
+    datasets: [
+      {
+        label: "Q1",
+        data: metricsData.map(entry => entry.q1),
+        backgroundColor: "#ef4444"
+      },
+      {
+        label: "Q2",
+        data: metricsData.map(entry => entry.q2),
+        backgroundColor: "#22c55e"
+      },
+      {
+        label: "Q3",
+        data: metricsData.map(entry => entry.q3),
+        backgroundColor: "#facc15"
+      },
+      {
+        label: "Q4",
+        data: metricsData.map(entry => entry.q4),
+        backgroundColor: "#9ca3af"
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: {
+        stacked: true,
+        type: "time",
+        time: { unit: "week", tooltipFormat: "dd/MM/yyyy" }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        ticks: { stepSize: 1 }
+      }
+    }
+  }
+});
+
+// === Gráfico: Roles activos por semana ===
+const rolesCtx = document.getElementById("chart_roles").getContext("2d");
+new Chart(rolesCtx, {
+  type: "line",
+  data: {
+    labels: metricsData.map(entry => parseISODate(entry.fecha)),
+    datasets: [{
+      label: "Roles Activos",
+      data: metricsData.map(entry => entry.roles_activos || 0),
+      backgroundColor: "#38bdf8",
+      borderColor: "#0ea5e9",
+      fill: false,
+      tension: 0.2
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: {
+        type: "time",
+        time: {
+          unit: "week",
+          tooltipFormat: "dd/MM/yyyy"
+        }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { stepSize: 1 }
+      }
+    }
+  }
+});
+
