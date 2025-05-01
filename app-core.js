@@ -668,9 +668,9 @@
       if(localStorage.getItem("habitus_lastResetDate") === todayDateStr) {
         alert(translations[lang]["warning_already_reset_today"]);
         // Eliminar registro anterior de métricas del mismo día
-        metrics = metrics.filter(m => !m.fecha.startsWith(now.toLocaleDateString('es-ES')));
+        metrics = metrics.filter(m => !m.fecha.startsWith(now.toISOString().split('T')[0]));
         // Eliminar registros anteriores del mismo día del log de tareas
-        const fechaActual = now.toLocaleDateString('es-ES');
+        const fechaActual = now.toISOString().split('T')[0];
         tasksLog = tasksLog.filter(entry => !entry.fechaCreacion.startsWith(fechaActual));
       }
       // 2. Confirmar si no pasaron 7 días
@@ -694,7 +694,7 @@
       const reviewText = document.getElementById("reviewInput").value.trim();
       // Crear registro de métricas
       const metricsEntry = {
-        fecha: now.toLocaleString('es-ES'),  // fecha actual formateada
+        fecha: now.toISOString(),  // fecha actual formateada
         totales: totalTasks,
         completadas: completedCount,
         pendientes: pendingCount,
@@ -719,12 +719,12 @@
         const completado = t.completado === 'ELIMINADO' ? 'ELIMINADO' : (t.completed ? 'SI' : 'NO');
 
         tasksLog.push({
-          fechaCreacion: new Date(t.createdDate).toLocaleString('es-ES'),
+          fechaCreacion: new Date(t.createdDate).toISOString(),
           tarea: t.name,
           rol: t.role,
           cuadrante: t.quadrant,
           completado: completado,
-          fechaFin: t.completedDate ? new Date(t.completedDate).toLocaleString('es-ES') : ""
+          fechaFin: t.completedDate ? new Date(t.completedDate).toISOString() : ""
         });
       });
       localStorage.setItem("habitus_tasksLog", JSON.stringify(tasksLog));
