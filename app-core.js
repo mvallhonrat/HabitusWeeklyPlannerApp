@@ -273,7 +273,12 @@
             labels.push(invalidDateMsg);
           }
           
-          completionPercentages.push(parseInt(metric.porcentaje) || 0);
+          // Remove % symbol if present and parse as integer
+          const porcentaje = typeof metric.porcentaje === 'string' ? 
+            parseInt(metric.porcentaje.replace('%', '')) : 
+            parseInt(metric.porcentaje);
+            
+          completionPercentages.push(porcentaje || 0);
           q1Counts.push(metric.q1 || 0);
           q2Counts.push(metric.q2 || 0);
           q3Counts.push(metric.q3 || 0);
@@ -724,11 +729,11 @@
       const reviewText = document.getElementById("reviewInput").value.trim();
       // Crear registro de métricas
       const metricsEntry = {
-        fecha: now.toISOString(),  // fecha actual formateada
+        fecha: now.toISOString(),  // Store in ISO format
         totales: totalTasks,
         completadas: completedCount,
         pendientes: pendingCount,
-        porcentaje: percent + "%",
+        porcentaje: percent,
         q1: quadCounts[0],
         q2: quadCounts[1],
         q3: quadCounts[2],
