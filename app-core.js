@@ -22,26 +22,7 @@
 
       if(storedRoles) roles = JSON.parse(storedRoles);
       if(storedTasks) tasks = JSON.parse(storedTasks);
-      if(storedMetrics) {
-        metrics = JSON.parse(storedMetrics);
-        // Migrate any existing metrics to ISO format
-        metrics = metrics.map(metric => {
-          if (metric.fecha && !metric.fecha.includes('T')) {
-            // If the date is not in ISO format, try to parse it
-            try {
-              const date = new Date(metric.fecha);
-              if (!isNaN(date.getTime())) {
-                metric.fecha = date.toISOString();
-              }
-            } catch (error) {
-              console.error('Error migrating metric date:', error);
-            }
-          }
-          return metric;
-        });
-        // Save migrated metrics
-        localStorage.setItem("habitus_metrics", JSON.stringify(metrics));
-      }
+      if(storedMetrics) metrics = JSON.parse(storedMetrics);
       if(storedTasksLog) tasksLog = JSON.parse(storedTasksLog);
       if(storedLastReview) lastReviewText = JSON.parse(storedLastReview);
       if(storedLastReset) lastResetTime = parseInt(storedLastReset);
@@ -903,6 +884,97 @@
       // Actualizar vistas
       updateRoleOptions();
       renderViews();
+    }
+
+    // === Función para migrar datos existentes ===
+    function migrateExistingData() {
+      try {
+        // Get existing data from localStorage
+        const storedMetrics = localStorage.getItem('metrics');
+        const storedTasks = localStorage.getItem('tasks');
+        const storedTasksLog = localStorage.getItem('tasksLog');
+
+        let hasChanges = false;
+
+        // Migrate metrics
+        if (storedMetrics) {
+          const metrics = JSON.parse(storedMetrics);
+          const updatedMetrics = metrics.map(metric => {
+            if (metric.fecha && !metric.fecha.includes('T')) {
+              try {
+                const date = new Date(metric.fecha);
+                if (!isNaN(date.getTime())) {
+                  metric.fecha = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating metric date:', e);
+              }
+            }
+            return metric;
+          });
+          if (hasChanges) {
+            localStorage.setItem('metrics', JSON.stringify(updatedMetrics));
+          }
+        }
+
+        // Migrate tasks
+        if (storedTasks) {
+          const tasks = JSON.parse(storedTasks);
+          const updatedTasks = tasks.map(task => {
+            if (task.fecha && !task.fecha.includes('T')) {
+              try {
+                const date = new Date(task.fecha);
+                if (!isNaN(date.getTime())) {
+                  task.fecha = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task date:', e);
+              }
+            }
+            return task;
+          });
+          if (hasChanges) {
+            localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+          }
+        }
+
+        // Migrate tasks log
+        if (storedTasksLog) {
+          const tasksLog = JSON.parse(storedTasksLog);
+          const updatedTasksLog = tasksLog.map(log => {
+            if (log.fecha && !log.fecha.includes('T')) {
+              try {
+                const date = new Date(log.fecha);
+                if (!isNaN(date.getTime())) {
+                  log.fecha = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task log date:', e);
+              }
+            }
+            return log;
+          });
+          if (hasChanges) {
+            localStorage.setItem('tasksLog', JSON.stringify(updatedTasksLog));
+          }
+        }
+
+        if (hasChanges) {
+          // Reload data and refresh views
+          loadData();
+          refreshViews();
+          initCharts();
+          alert(currentLanguage === 'es' ? 'Datos migrados exitosamente' : 'Data migrated successfully');
+        } else {
+          alert(currentLanguage === 'es' ? 'No se encontraron datos para migrar' : 'No data found to migrate');
+        }
+      } catch (error) {
+        console.error('Error during migration:', error);
+        alert(currentLanguage === 'es' ? 'Error durante la migración' : 'Error during migration');
+      }
     }
 
     // === Inicializar la aplicación al cargar la página ===
