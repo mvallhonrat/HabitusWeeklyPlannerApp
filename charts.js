@@ -1,94 +1,94 @@
 
-// === charts.js ===
-// Función para inicializar todos los gráficos históricos
-function initHistoricalCharts(metrics) {
-  const lang = getLanguage();
-  const formatDate = d => new Date(d.fecha).toLocaleDateString(lang === "es" ? "es-ES" : "en-US");
+// charts.js - Gráficos históricos de métricas
 
-  const labels = metrics.map(m => formatDate(m));
-  const percent = metrics.map(m => parseInt(m.porcentaje));
-  const roles = metrics.map(m => m.roles || 0);
-  const q1 = metrics.map(m => m.q1 || 0);
-  const q2 = metrics.map(m => m.q2 || 0);
-  const q3 = metrics.map(m => m.q3 || 0);
-  const q4 = metrics.map(m => m.q4 || 0);
+import { getMetrics } from './storage.js';
 
-  const ctx1 = document.getElementById("chartPercent").getContext("2d");
-  new Chart(ctx1, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: translate("chart_completion_label"),
-        data: percent,
-        backgroundColor: "rgba(34, 197, 94, 0.2)",
-        borderColor: "rgb(34, 197, 94)",
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: translate("chart_percent_title") },
-        legend: { display: false }
+export function renderCharts(lang = "es") {
+  const metrics = getMetrics();
+
+  // Función robusta para formatear fechas
+  const formatDate = (d, lang) => {
+    try {
+      const dt = new Date(d.fecha || d);
+      return dt.toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return "???";
+    }
+  };
+
+  const labels = metrics.map(m => formatDate(m, lang));
+
+  // Datos para los gráficos
+  const dataCompletion = {
+    labels,
+    datasets: [{
+      label: lang === "es" ? "Porcentaje Completado" : "Completion Percentage",
+      data: metrics.map(m => parseFloat(m.porcentaje.replace('%','')) || 0),
+      backgroundColor: "#4ade80"
+    }]
+  };
+
+  const dataQuadrants = {
+    labels,
+    datasets: [
+      {
+        label: "Q1",
+        data: metrics.map(m => m.q1),
+        backgroundColor: "#ef4444"
+      },
+      {
+        label: "Q2",
+        data: metrics.map(m => m.q2),
+        backgroundColor: "#22c55e"
+      },
+      {
+        label: "Q3",
+        data: metrics.map(m => m.q3),
+        backgroundColor: "#eab308"
+      },
+      {
+        label: "Q4",
+        data: metrics.map(m => m.q4),
+        backgroundColor: "#9ca3af"
+      }
+    ]
+  };
+
+  const dataRoles = {
+    labels,
+    datasets: [{
+      label: lang === "es" ? "Roles Activos" : "Active Roles",
+      data: metrics.map(m => m.roles || 0),
+      backgroundColor: "#60a5fa"
+    }]
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { stepSize: 1 }
       }
     }
+  };
+
+  new Chart(document.getElementById("chartHistoric1"), {
+    type: "bar",
+    data: dataCompletion,
+    options: { ...options, plugins: { title: { display: true, text: lang === "es" ? "Porcentaje de Completado por Semana" : "Weekly Completion Percentage" } } }
   });
 
-  const ctx2 = document.getElementById("chartQuadrants").getContext("2d");
-  new Chart(ctx2, {
+  new Chart(document.getElementById("chartHistoric2"), {
     type: "bar",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: translate("quadrant1"),
-          data: q1,
-          backgroundColor: "#ef4444"
-        },
-        {
-          label: translate("quadrant2"),
-          data: q2,
-          backgroundColor: "#22c55e"
-        },
-        {
-          label: translate("quadrant3"),
-          data: q3,
-          backgroundColor: "#eab308"
-        },
-        {
-          label: translate("quadrant4"),
-          data: q4,
-          backgroundColor: "#9ca3af"
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: translate("chart_quadrants_title") },
-        legend: { position: "bottom" }
-      }
-    }
+    data: dataQuadrants,
+    options: { ...options, plugins: { title: { display: true, text: lang === "es" ? "Tareas por Cuadrante por Semana" : "Tasks per Quadrant per Week" } } }
   });
 
-  const ctx3 = document.getElementById("chartRoles").getContext("2d");
-  new Chart(ctx3, {
+  new Chart(document.getElementById("chartHistoric3"), {
     type: "bar",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: translate("chart_roles_label"),
-        data: roles,
-        backgroundColor: "#6366f1"
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: translate("chart_roles_title") },
-        legend: { display: false }
-      }
-    }
+    data: dataRoles,
+    options: { ...options, plugins: { title: { display: true, text: lang === "es" ? "Roles Activos por Semana" : "Active Roles per Week" } } }
   });
 }
