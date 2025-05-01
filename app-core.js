@@ -889,6 +889,7 @@
     // === Función para migrar datos existentes ===
     function migrateExistingData() {
       try {
+        console.log('Starting data migration...');
         // Get current language
         const currentLanguage = localStorage.getItem("habitus_lang") || "es";
         
@@ -901,6 +902,7 @@
 
         // Migrate metrics
         if (storedMetrics) {
+          console.log('Migrating metrics...');
           const metrics = JSON.parse(storedMetrics);
           const updatedMetrics = metrics.map(metric => {
             if (metric.fecha && !metric.fecha.includes('T')) {
@@ -923,6 +925,7 @@
 
         // Migrate tasks
         if (storedTasks) {
+          console.log('Migrating tasks...');
           const tasks = JSON.parse(storedTasks);
           const updatedTasks = tasks.map(task => {
             if (task.createdDate && !task.createdDate.includes('T')) {
@@ -956,6 +959,7 @@
 
         // Migrate tasks log
         if (storedTasksLog) {
+          console.log('Migrating tasks log...');
           const tasksLog = JSON.parse(storedTasksLog);
           const updatedTasksLog = tasksLog.map(log => {
             if (log.fechaCreacion && !log.fechaCreacion.includes('T')) {
@@ -988,12 +992,14 @@
         }
 
         if (hasChanges) {
+          console.log('Migration completed successfully');
           // Reload data and refresh views
           loadData();
           renderViews();
           initCharts();
           alert(currentLanguage === 'es' ? 'Datos migrados exitosamente' : 'Data migrated successfully');
         } else {
+          console.log('No data needed migration');
           alert(currentLanguage === 'es' ? 'No se encontraron datos para migrar' : 'No data found to migrate');
         }
       } catch (error) {
