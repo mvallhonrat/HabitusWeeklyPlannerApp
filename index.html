@@ -1410,13 +1410,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="charts.js"></script>
 <script src="app-core.js"></script>
 <script>
-// Ensure migrateExistingData is available globally
-if (typeof migrateExistingData !== 'function') {
-  console.error('migrateExistingData function is not available');
-}
+// Wait for all scripts to load
+window.addEventListener('load', () => {
+  // Ensure migrateExistingData is available globally
+  if (typeof migrateExistingData !== 'function') {
+    console.error('migrateExistingData function is not available');
+  }
 
-// Add event listener to migration button
-document.addEventListener('DOMContentLoaded', () => {
+  // Add event listener to migration button
   const migrateBtn = document.getElementById('migrateDataBtn');
   if (migrateBtn) {
     migrateBtn.addEventListener('click', () => {
