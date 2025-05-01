@@ -887,7 +887,7 @@
     }
 
     // === Función para migrar datos existentes ===
-    function migrateExistingData() {
+    window.migrateExistingData = function() {
       try {
         // Get existing data from localStorage with correct keys
         const storedMetrics = localStorage.getItem('habitus_metrics');
@@ -997,7 +997,7 @@
         console.error('Error during migration:', error);
         alert(currentLanguage === 'es' ? 'Error durante la migración' : 'Error during migration');
       }
-    }
+    };
 
     // === Inicializar la aplicación al cargar la página ===
     document.addEventListener('DOMContentLoaded', () => {
