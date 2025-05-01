@@ -1407,4 +1407,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 </script></body>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const lang = localStorage.getItem("habitus_lang") || "es";
+    renderCharts(lang);
+  });
+</script>
 </html>
