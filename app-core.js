@@ -246,20 +246,50 @@
       const q4Counts = [];
       const activeRoles = [];
 
+      // Get current language
+      const lang = localStorage.getItem("habitus_lang") || "es";
+      const invalidDateMsg = lang === "en" ? "Invalid Date" : "Fecha no válida";
+
       // Ordenar métricas por fecha
       const sortedMetrics = [...metrics].sort((a, b) => 
         new Date(a.fecha) - new Date(b.fecha)
       );
 
       sortedMetrics.forEach(metric => {
-        const date = new Date(metric.fecha);
-        labels.push(date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }));
-        completionPercentages.push(parseInt(metric.porcentaje));
-        q1Counts.push(metric.q1);
-        q2Counts.push(metric.q2);
-        q3Counts.push(metric.q3);
-        q4Counts.push(metric.q4);
-        activeRoles.push(metric.roles || 0);
+        try {
+          // Ensure we have a valid date string
+          const dateStr = metric.fecha || '';
+          const date = new Date(dateStr);
+          
+          // Check if date is valid before using it
+          if (!isNaN(date.getTime())) {
+            labels.push(date.toLocaleDateString(lang === "en" ? "en-US" : "es-ES", { 
+              month: 'short', 
+              day: 'numeric',
+              year: 'numeric'
+            }));
+          } else {
+            // Fallback to a default label if date is invalid
+            labels.push(invalidDateMsg);
+          }
+          
+          completionPercentages.push(parseInt(metric.porcentaje) || 0);
+          q1Counts.push(metric.q1 || 0);
+          q2Counts.push(metric.q2 || 0);
+          q3Counts.push(metric.q3 || 0);
+          q4Counts.push(metric.q4 || 0);
+          activeRoles.push(metric.roles || 0);
+        } catch (error) {
+          console.error('Error processing metric:', error);
+          // Add fallback values for this entry
+          labels.push(invalidDateMsg);
+          completionPercentages.push(0);
+          q1Counts.push(0);
+          q2Counts.push(0);
+          q3Counts.push(0);
+          q4Counts.push(0);
+          activeRoles.push(0);
+        }
       });
 
       return {
