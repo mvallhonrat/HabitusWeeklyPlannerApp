@@ -22,7 +22,26 @@
 
       if(storedRoles) roles = JSON.parse(storedRoles);
       if(storedTasks) tasks = JSON.parse(storedTasks);
-      if(storedMetrics) metrics = JSON.parse(storedMetrics);
+      if(storedMetrics) {
+        metrics = JSON.parse(storedMetrics);
+        // Migrate any existing metrics to ISO format
+        metrics = metrics.map(metric => {
+          if (metric.fecha && !metric.fecha.includes('T')) {
+            // If the date is not in ISO format, try to parse it
+            try {
+              const date = new Date(metric.fecha);
+              if (!isNaN(date.getTime())) {
+                metric.fecha = date.toISOString();
+              }
+            } catch (error) {
+              console.error('Error migrating metric date:', error);
+            }
+          }
+          return metric;
+        });
+        // Save migrated metrics
+        localStorage.setItem("habitus_metrics", JSON.stringify(metrics));
+      }
       if(storedTasksLog) tasksLog = JSON.parse(storedTasksLog);
       if(storedLastReview) lastReviewText = JSON.parse(storedLastReview);
       if(storedLastReset) lastResetTime = parseInt(storedLastReset);
