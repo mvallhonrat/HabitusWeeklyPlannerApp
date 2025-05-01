@@ -889,10 +889,10 @@
     // === Función para migrar datos existentes ===
     function migrateExistingData() {
       try {
-        // Get existing data from localStorage
-        const storedMetrics = localStorage.getItem('metrics');
-        const storedTasks = localStorage.getItem('tasks');
-        const storedTasksLog = localStorage.getItem('tasksLog');
+        // Get existing data from localStorage with correct keys
+        const storedMetrics = localStorage.getItem('habitus_metrics');
+        const storedTasks = localStorage.getItem('habitus_tasks');
+        const storedTasksLog = localStorage.getItem('habitus_tasksLog');
 
         let hasChanges = false;
 
@@ -914,7 +914,7 @@
             return metric;
           });
           if (hasChanges) {
-            localStorage.setItem('metrics', JSON.stringify(updatedMetrics));
+            localStorage.setItem('habitus_metrics', JSON.stringify(updatedMetrics));
           }
         }
 
@@ -922,21 +922,32 @@
         if (storedTasks) {
           const tasks = JSON.parse(storedTasks);
           const updatedTasks = tasks.map(task => {
-            if (task.fecha && !task.fecha.includes('T')) {
+            if (task.createdDate && !task.createdDate.includes('T')) {
               try {
-                const date = new Date(task.fecha);
+                const date = new Date(task.createdDate);
                 if (!isNaN(date.getTime())) {
-                  task.fecha = date.toISOString();
+                  task.createdDate = date.toISOString();
                   hasChanges = true;
                 }
               } catch (e) {
-                console.error('Error migrating task date:', e);
+                console.error('Error migrating task createdDate:', e);
+              }
+            }
+            if (task.completedDate && !task.completedDate.includes('T')) {
+              try {
+                const date = new Date(task.completedDate);
+                if (!isNaN(date.getTime())) {
+                  task.completedDate = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task completedDate:', e);
               }
             }
             return task;
           });
           if (hasChanges) {
-            localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+            localStorage.setItem('habitus_tasks', JSON.stringify(updatedTasks));
           }
         }
 
@@ -944,28 +955,39 @@
         if (storedTasksLog) {
           const tasksLog = JSON.parse(storedTasksLog);
           const updatedTasksLog = tasksLog.map(log => {
-            if (log.fecha && !log.fecha.includes('T')) {
+            if (log.fechaCreacion && !log.fechaCreacion.includes('T')) {
               try {
-                const date = new Date(log.fecha);
+                const date = new Date(log.fechaCreacion);
                 if (!isNaN(date.getTime())) {
-                  log.fecha = date.toISOString();
+                  log.fechaCreacion = date.toISOString();
                   hasChanges = true;
                 }
               } catch (e) {
-                console.error('Error migrating task log date:', e);
+                console.error('Error migrating task log fechaCreacion:', e);
+              }
+            }
+            if (log.fechaFin && !log.fechaFin.includes('T')) {
+              try {
+                const date = new Date(log.fechaFin);
+                if (!isNaN(date.getTime())) {
+                  log.fechaFin = date.toISOString();
+                  hasChanges = true;
+                }
+              } catch (e) {
+                console.error('Error migrating task log fechaFin:', e);
               }
             }
             return log;
           });
           if (hasChanges) {
-            localStorage.setItem('tasksLog', JSON.stringify(updatedTasksLog));
+            localStorage.setItem('habitus_tasksLog', JSON.stringify(updatedTasksLog));
           }
         }
 
         if (hasChanges) {
           // Reload data and refresh views
           loadData();
-          refreshViews();
+          renderViews();
           initCharts();
           alert(currentLanguage === 'es' ? 'Datos migrados exitosamente' : 'Data migrated successfully');
         } else {
