@@ -592,33 +592,191 @@ const Tasks = (() => {
 
     // Create task element
     function createTaskElement(task) {
-        const role = Roles.getRoleById(task.roleId);
-        return `
-            <div class="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="flex items-center gap-3 flex-1">
-                    <button 
-                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus-visible p-1" 
-                        onclick="Tasks.toggleTaskCompletion('${task.id}')"
-                        title="${task.completed ? Translations.getTranslation('incomplete_task') : Translations.getTranslation('complete_task')}"
-                    >
-                        ${task.completed ? '✅' : '⭕'}
-                    </button>
-                    <span class="text-gray-800 dark:text-gray-200 ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
-                        ${task.description}
-                    </span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500 dark:text-gray-400">${role?.name || 'Unknown'}</span>
-                    <button 
-                        class="text-red-500 hover:text-red-700 dark:hover:text-red-400 focus-visible p-1" 
-                        onclick="Tasks.deleteTask('${task.id}')"
-                        title="${Translations.getTranslation('delete_task')}"
-                    >
-                        🗑️
-                    </button>
-                </div>
-            </div>
-        `;
+        const taskElement = document.createElement('div');
+        taskElement.className = 'task-item bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-2 relative group';
+        taskElement.draggable = true;
+        taskElement.dataset.taskId = task.id;
+        
+        // Add drag handle
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'drag-handle absolute left-2 top-1/2 -translate-y-1/2 cursor-move opacity-0 group-hover:opacity-100 transition-opacity';
+        dragHandle.innerHTML = '⋮⋮';
+        dragHandle.style.width = '20px';
+        dragHandle.style.height = '20px';
+        dragHandle.style.display = 'flex';
+        dragHandle.style.alignItems = 'center';
+        dragHandle.style.justifyContent = 'center';
+        
+        // Task content container
+        const contentContainer = document.createElement('div');
+        contentContainer.className = 'pl-8'; // Add padding for drag handle
+        
+        // Task description
+        const description = document.createElement('p');
+        description.className = `text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}`;
+        description.textContent = task.description;
+        
+        // Task metadata
+        const metadata = document.createElement('div');
+        metadata.className = 'flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400';
+        
+        // Role badge
+        const roleBadge = document.createElement('span');
+        roleBadge.className = 'role-badge px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+        roleBadge.textContent = Roles.getRoleName(task.roleId);
+        roleBadge.dataset.roleId = task.roleId;
+        
+        // Quadrant badge
+        const quadrantBadge = document.createElement('span');
+        quadrantBadge.className = 'quadrant-badge px-2 py-1 rounded-full ml-2';
+        quadrantBadge.textContent = `Q${task.quadrant}`;
+        quadrantBadge.dataset.quadrant = task.quadrant;
+        
+        // Set quadrant badge color
+        switch(task.quadrant) {
+            case 1:
+                quadrantBadge.classList.add('bg-red-100', 'dark:bg-red-900', 'text-red-800', 'dark:text-red-200');
+                break;
+            case 2:
+                quadrantBadge.classList.add('bg-yellow-100', 'dark:bg-yellow-900', 'text-yellow-800', 'dark:text-yellow-200');
+                break;
+            case 3:
+                quadrantBadge.classList.add('bg-green-100', 'dark:bg-green-900', 'text-green-800', 'dark:text-green-200');
+                break;
+            case 4:
+                quadrantBadge.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
+                break;
+        }
+        
+        // Completion checkbox
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'task-checkbox mr-2';
+        checkbox.checked = task.completed;
+        checkbox.addEventListener('change', () => toggleTaskCompletion(task.id));
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-task text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+        
+        // Assemble task element
+        metadata.appendChild(roleBadge);
+        metadata.appendChild(quadrantBadge);
+        contentContainer.appendChild(description);
+        contentContainer.appendChild(metadata);
+        taskElement.appendChild(dragHandle);
+        taskElement.appendChild(checkbox);
+        taskElement.appendChild(contentContainer);
+        taskElement.appendChild(deleteBtn);
+        
+        // Add drag and drop event listeners
+        setupDragAndDrop(taskElement, task);
+        
+        return taskElement;
+    }
+
+    // Setup drag and drop for a task element
+    function setupDragAndDrop(taskElement, task) {
+        // Drag start
+        taskElement.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', task.id);
+            taskElement.classList.add('opacity-50');
+            
+            // Add dragging class to body for global styles
+            document.body.classList.add('dragging');
+        });
+        
+        // Drag end
+        taskElement.addEventListener('dragend', () => {
+            taskElement.classList.remove('opacity-50');
+            document.body.classList.remove('dragging');
+        });
+        
+        // Make role and quadrant badges drop targets
+        const roleBadge = taskElement.querySelector('.role-badge');
+        const quadrantBadge = taskElement.querySelector('.quadrant-badge');
+        
+        // Role badge drop handling
+        roleBadge.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            roleBadge.classList.add('bg-blue-200', 'dark:bg-blue-800');
+        });
+        
+        roleBadge.addEventListener('dragleave', () => {
+            roleBadge.classList.remove('bg-blue-200', 'dark:bg-blue-800');
+        });
+        
+        roleBadge.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            roleBadge.classList.remove('bg-blue-200', 'dark:bg-blue-800');
+            
+            const draggedTaskId = e.dataTransfer.getData('text/plain');
+            const newRoleId = roleBadge.dataset.roleId;
+            
+            if (draggedTaskId !== task.id) {
+                updateTaskRole(draggedTaskId, newRoleId);
+            }
+        });
+        
+        // Quadrant badge drop handling
+        quadrantBadge.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            quadrantBadge.classList.add('ring-2', 'ring-offset-2', 'ring-current');
+        });
+        
+        quadrantBadge.addEventListener('dragleave', () => {
+            quadrantBadge.classList.remove('ring-2', 'ring-offset-2', 'ring-current');
+        });
+        
+        quadrantBadge.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            quadrantBadge.classList.remove('ring-2', 'ring-offset-2', 'ring-current');
+            
+            const draggedTaskId = e.dataTransfer.getData('text/plain');
+            const newQuadrant = parseInt(quadrantBadge.dataset.quadrant);
+            
+            if (draggedTaskId !== task.id) {
+                updateTaskQuadrant(draggedTaskId, newQuadrant);
+            }
+        });
+    }
+
+    // Update task role
+    function updateTaskRole(taskId, newRoleId) {
+        const taskIndex = tasks.findIndex(task => task.id === taskId);
+        if (taskIndex === -1) return;
+        
+        tasks[taskIndex].roleId = newRoleId;
+        saveTasks();
+        updateUI();
+        
+        // Notify success
+        const successMsg = Translations.getTranslation('notifications.task_updated');
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: successMsg, type: 'success' }
+        }));
+    }
+
+    // Update task quadrant
+    function updateTaskQuadrant(taskId, newQuadrant) {
+        const taskIndex = tasks.findIndex(task => task.id === taskId);
+        if (taskIndex === -1) return;
+        
+        tasks[taskIndex].quadrant = newQuadrant;
+        saveTasks();
+        updateUI();
+        
+        // Notify success
+        const successMsg = Translations.getTranslation('notifications.task_updated');
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: successMsg, type: 'success' }
+        }));
     }
 
     // Update metrics
