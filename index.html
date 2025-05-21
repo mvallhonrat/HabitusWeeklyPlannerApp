@@ -30,9 +30,10 @@
 </div>
 <div class="mb-6" id="pasaje-inspirador">
     <div class="text-gray-700 text-center mt-2" id="verso-contenedor">
+        <!-- The inspirational quote will be loaded here dynamically -->
         <div class="bg-white rounded-lg shadow-sm p-4">
-            <p class="text-lg font-medium text-gray-800" data-i18n="loading_quote">Cargando versículo...</p>
-            <p class="text-sm text-gray-600 mt-2 italic" data-i18n="loading_quote_sub">Por favor espera...</p>
+            <p class="text-lg font-medium text-gray-800">Cargando versículo...</p>
+            <p class="text-sm text-gray-600 mt-2 italic">Por favor espera...</p>
         </div>
     </div>
 </div></div><script src="https://cdn.tailwindcss.com"></script>
@@ -328,14 +329,15 @@
 <!-- Load scripts in correct order -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
+
+<!-- Create hidden data elements -->
+<div id="translations-data" style="display: none;"></div>
+<div id="passages-data" style="display: none;"></div>
+
 <script src="translations.js"></script>
 <script src="roles.js"></script>
 <script src="tasks.js"></script>
 <script src="app.js"></script>
-
-<!-- Load data files -->
-<script src="translations.json" type="application/json" id="translations-data"></script>
-<script src="passages.json" type="application/json" id="passages-data"></script>
 
 <script>
 // Global error handler
@@ -347,9 +349,11 @@ window.onerror = function(msg, url, lineNo, columnNo, error) {
 // Load JSON data
 async function loadJSONData(url) {
     try {
-        console.log(`Loading ${url}...`);
+        console.log(`Loading data from ${url}...`);
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`Failed to load ${url}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load ${url}: ${response.status} ${response.statusText}`);
+        }
         const data = await response.json();
         console.log(`Successfully loaded ${url}`);
         return data;
@@ -364,29 +368,79 @@ async function initApp() {
     try {
         console.log('Starting application initialization...');
         
-        // Initialize translations first
-        await Translations.init();
+        // Show loading state
+        const quoteContainer = document.getElementById('verso-contenedor');
+        if (quoteContainer) {
+            quoteContainer.innerHTML = `
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <p class="text-lg font-medium text-gray-800">Cargando aplicación...</p>
+                    <p class="text-sm text-gray-600 mt-2 italic">Por favor espera...</p>
+                </div>
+            `;
+        }
+        
+        // Load translations and passages first
+        let translations, passages;
+        try {
+            [translations, passages] = await Promise.all([
+                loadJSONData('translations.json'),
+                loadJSONData('passages.json')
+            ]);
+            
+            // Set translations data
+            const translationsData = document.getElementById('translations-data');
+            if (translationsData) {
+                translationsData.textContent = JSON.stringify(translations);
+            } else {
+                throw new Error('Translations data element not found');
+            }
+            
+            // Set passages data
+            const passagesData = document.getElementById('passages-data');
+            if (passagesData) {
+                passagesData.textContent = JSON.stringify(passages);
+            } else {
+                throw new Error('Passages data element not found');
+            }
+            
+            console.log('Data loaded successfully');
+        } catch (error) {
+            console.error('Error loading application data:', error);
+            if (quoteContainer) {
+                quoteContainer.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <p class="text-lg font-medium text-gray-800">Error al cargar los datos de la aplicación</p>
+                        <p class="text-sm text-gray-600 mt-2 italic">Por favor, recarga la página</p>
+                    </div>
+                `;
+            }
+            throw error; // Re-throw to prevent app initialization
+        }
         
         // Initialize App module
-        await App.init();
+        try {
+            await App.init();
+            console.log('App module initialized successfully');
+        } catch (error) {
+            console.error('Error initializing App module:', error);
+            throw error;
+        }
         
-        // Set up language switch
+        // Initialize language switch
         const langSwitch = document.getElementById('langSwitch');
         if (langSwitch) {
             // Set initial state based on saved language
-            const savedLang = Translations.getCurrentLanguage();
+            const savedLang = localStorage.getItem('habitus_lang') || 'es';
             langSwitch.classList.toggle('active', savedLang === 'en');
             
-            // Add click event listener
             langSwitch.addEventListener('click', async () => {
                 try {
                     const currentLang = Translations.getCurrentLanguage();
                     const newLang = currentLang === 'es' ? 'en' : 'es';
                     await Translations.setLanguage(newLang);
-                    console.log(`Language switched to: ${newLang}`);
+                    langSwitch.classList.toggle('active');
                 } catch (error) {
                     console.error('Error switching language:', error);
-                    App.showNotification('Error switching language', 'error');
                 }
             });
         }
@@ -401,7 +455,16 @@ async function initApp() {
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Error initializing application:', error);
-        App.showNotification('Error initializing application', 'error');
+        // Show error message to user
+        const quoteContainer = document.getElementById('verso-contenedor');
+        if (quoteContainer) {
+            quoteContainer.innerHTML = `
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <p class="text-lg font-medium text-gray-800">Error al inicializar la aplicación</p>
+                    <p class="text-sm text-gray-600 mt-2 italic">Por favor, recarga la página</p>
+                </div>
+            `;
+        }
     }
 }
 
@@ -452,14 +515,17 @@ async function migrateData() {
 }
 
 // Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', () => {
+    // Add a small delay to ensure all scripts are loaded
+    setTimeout(initApp, 100);
+});
 
 // Register service worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register(`${window.location.pathname}service-worker.js`, {
-                scope: window.location.pathname
+            const registration = await navigator.serviceWorker.register('./service-worker.js', {
+                scope: './'
             });
             console.log('ServiceWorker registration successful:', registration);
         } catch (err) {

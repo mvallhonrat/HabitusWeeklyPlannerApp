@@ -7,74 +7,14 @@ const Translations = (() => {
     let translations = {};
     let currentLanguage = 'es';
     let isInitialized = false;
-    const BASE_PATH = '/HabitusWeeklyPlannerApp/';
 
     // DOM Elements
     const elements = {
         langSelector: null,
         translationsData: null,
-        langSwitch: null
+        langSwitch: null,
+        quoteContainer: null
     };
-
-    // Load translations from JSON
-    async function loadTranslations() {
-        try {
-            console.log('Loading translations...');
-            
-            // Try to fetch translations directly first
-            try {
-                const response = await fetch(`${BASE_PATH}translations.json`);
-                if (!response.ok) {
-                    // Try without base path as fallback
-                    const fallbackResponse = await fetch('translations.json');
-                    if (!fallbackResponse.ok) throw new Error('Failed to fetch translations');
-                    translations = await fallbackResponse.json();
-                } else {
-                    translations = await response.json();
-                }
-                console.log('Translations loaded from fetch');
-            } catch (fetchError) {
-                console.warn('Error fetching translations:', fetchError);
-                
-                // Fallback to data element
-                if (elements.translationsData && elements.translationsData.textContent) {
-                    try {
-                        translations = JSON.parse(elements.translationsData.textContent);
-                        console.log('Translations loaded from data element');
-                    } catch (parseError) {
-                        console.error('Error parsing translations from data element:', parseError);
-                        throw new Error('Invalid translations data format');
-                    }
-                } else {
-                    // Last resort: try to load from script tag
-                    const scriptElement = document.querySelector('script[src*="translations.json"]');
-                    if (scriptElement) {
-                        try {
-                            const response = await fetch(scriptElement.src);
-                            if (!response.ok) throw new Error('Failed to fetch translations from script tag');
-                            translations = await response.json();
-                            console.log('Translations loaded from script tag');
-                        } catch (scriptError) {
-                            console.error('Error loading translations from script tag:', scriptError);
-                            throw new Error('No translations data available');
-                        }
-                    } else {
-                        throw new Error('No translations data available');
-                    }
-                }
-            }
-            
-            if (!translations || !translations.es || !translations.en) {
-                throw new Error('Invalid translations format');
-            }
-            
-            console.log('Translations loaded successfully:', Object.keys(translations));
-            return translations;
-        } catch (error) {
-            console.error('Error loading translations:', error);
-            throw error;
-        }
-    }
 
     // Initialize translations module
     async function init() {
@@ -85,36 +25,86 @@ const Translations = (() => {
             elements.langSelector = document.getElementById('langSelector');
             elements.translationsData = document.getElementById('translations-data');
             elements.langSwitch = document.getElementById('langSwitch');
+            elements.quoteContainer = document.getElementById('verso-contenedor');
 
-            // Load translations first
-            await loadTranslations();
-            
             // Load saved language preference
             const savedLang = localStorage.getItem('habitus_lang') || 'es';
             
+            // Load translations
+            await loadTranslations();
+            
             // Set initial language
             await setLanguage(savedLang);
-            
-            // Set initial switch state
-            if (elements.langSwitch) {
-                elements.langSwitch.classList.toggle('active', savedLang === 'en');
-            }
             
             isInitialized = true;
             console.log('Translations module initialized successfully');
         } catch (error) {
             console.error('Error initializing Translations module:', error);
-            throw error;
+            // Don't throw, just log the error and continue with defaults
+            isInitialized = true;
+        }
+    }
+
+    // Load translations from JSON
+    async function loadTranslations() {
+        try {
+            console.log('Loading translations...');
+            
+            // Try to load from data element first
+            if (elements.translationsData && elements.translationsData.textContent) {
+                try {
+                    const data = JSON.parse(elements.translationsData.textContent);
+                    if (data && data.es && data.en) {
+                        translations = data;
+                        console.log('Translations loaded from data element');
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('Error loading translations from data element:', error);
+                }
+            }
+
+            // Try to load from file
+            try {
+                const response = await fetch('translations.json');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.es && data.en) {
+                        translations = data;
+                        console.log('Translations loaded from file');
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error loading translations from file:', error);
+            }
+
+            // If we get here, use default translations
+            translations = {
+                es: {
+                    title: "Habitus - Planificador Semanal",
+                    loading_quote: "Cargando versículo...",
+                    loading_quote_sub: "Por favor espera...",
+                    error_loading_quote: "Error al cargar el versículo"
+                },
+                en: {
+                    title: "Habitus - Weekly Planner",
+                    loading_quote: "Loading verse...",
+                    loading_quote_sub: "Please wait...",
+                    error_loading_quote: "Error loading verse"
+                }
+            };
+            console.log('Using default translations');
+        } catch (error) {
+            console.error('Error in loadTranslations:', error);
+            // Use default translations instead of throwing
+            return translations;
         }
     }
 
     // Set the current language
     async function setLanguage(lang) {
         try {
-            if (!isInitialized) {
-                await init();
-            }
-            
             console.log(`Setting language to: ${lang}`);
             
             // Validate language
@@ -234,82 +224,69 @@ const Translations = (() => {
             }
 
             console.log('Updating inspirational quote...');
-            let passages;
-            
-            // Try to fetch passages directly first
-            try {
-                const response = await fetch(`${BASE_PATH}passages.json`);
-                if (!response.ok) {
-                    // Try without base path as fallback
-                    const fallbackResponse = await fetch('passages.json');
-                    if (!fallbackResponse.ok) throw new Error('Failed to fetch passages');
-                    passages = await fallbackResponse.json();
-                } else {
-                    passages = await response.json();
+            let passages = null;
+
+            // Try to load from data element first
+            const passagesData = document.getElementById('passages-data');
+            if (passagesData && passagesData.textContent) {
+                try {
+                    passages = JSON.parse(passagesData.textContent);
+                    console.log('Passages loaded from data element');
+                } catch (error) {
+                    console.warn('Error loading passages from data element:', error);
                 }
-                console.log('Passages loaded from fetch');
-            } catch (fetchError) {
-                console.warn('Error fetching passages:', fetchError);
-                
-                // Fallback to data element
-                const passagesData = document.getElementById('passages-data');
-                if (passagesData && passagesData.textContent) {
-                    try {
-                        passages = JSON.parse(passagesData.textContent);
-                        console.log('Passages loaded from data element');
-                    } catch (parseError) {
-                        console.error('Error parsing passages from data element:', parseError);
-                        // Last resort: try to load from script tag
-                        const scriptElement = document.querySelector('script[src*="passages.json"]');
-                        if (scriptElement) {
-                            try {
-                                const response = await fetch(scriptElement.src);
-                                if (!response.ok) throw new Error('Failed to fetch passages from script tag');
-                                passages = await response.json();
-                                console.log('Passages loaded from script tag');
-                            } catch (scriptError) {
-                                console.error('Error loading passages from script tag:', scriptError);
-                                throw new Error('No passages data available');
-                            }
-                        } else {
-                            throw new Error('No passages data available');
-                        }
-                    }
-                } else {
-                    throw new Error('No passages data available');
-                }
-            }
-            
-            if (!passages || !passages[currentLanguage] || !Array.isArray(passages[currentLanguage])) {
-                throw new Error('Invalid passages format');
             }
 
-            const languagePassages = passages[currentLanguage];
+            // If data element failed, try to load from file
+            if (!passages) {
+                try {
+                    const response = await fetch('passages.json');
+                    if (response.ok) {
+                        passages = await response.json();
+                        console.log('Passages loaded from file');
+                    }
+                } catch (error) {
+                    console.warn('Error loading passages from file:', error);
+                }
+            }
+
+            // If both attempts failed, use default passage
+            if (!passages || !passages[currentLanguage] || !passages[currentLanguage].length) {
+                passages = {
+                    es: [{
+                        contenido: "Porque yo sé los planes que tengo para ti, dice el Señor, planes de bienestar y no de calamidad, para darte un futuro y una esperanza.",
+                        pasaje: "Jeremías 29:11"
+                    }],
+                    en: [{
+                        contenido: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.",
+                        pasaje: "Jeremiah 29:11"
+                    }]
+                };
+                console.log('Using default passage');
+            }
+
+            const languagePassages = passages[currentLanguage] || passages.es;
             const randomIndex = Math.floor(Math.random() * languagePassages.length);
             const passage = languagePassages[randomIndex];
-            
-            if (!passage || !passage.contenido || !passage.pasaje) {
-                throw new Error('Invalid passage format');
-            }
 
-            const quoteContainer = document.getElementById('verso-contenedor');
-            if (quoteContainer) {
-                quoteContainer.innerHTML = `
+            if (elements.quoteContainer) {
+                elements.quoteContainer.innerHTML = `
                     <div class="bg-white rounded-lg shadow-sm p-4">
                         <p class="text-lg font-medium text-gray-800">${passage.contenido}</p>
                         <p class="text-sm text-gray-600 mt-2 italic">${passage.pasaje}</p>
                     </div>
                 `;
                 console.log('Inspirational quote updated successfully');
+            } else {
+                console.warn('Quote container element not found');
             }
         } catch (error) {
             console.error('Error updating inspirational quote:', error);
-            const quoteContainer = document.getElementById('verso-contenedor');
-            if (quoteContainer) {
+            if (elements.quoteContainer) {
                 const errorMessage = currentLanguage === 'es' 
                     ? 'Error al cargar el versículo'
                     : 'Error loading verse';
-                quoteContainer.innerHTML = `
+                elements.quoteContainer.innerHTML = `
                     <div class="bg-white rounded-lg shadow-sm p-4">
                         <p class="text-lg font-medium text-gray-800">${errorMessage}</p>
                         <p class="text-sm text-gray-600 mt-2 italic">${error.message}</p>
