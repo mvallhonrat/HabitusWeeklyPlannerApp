@@ -26,7 +26,9 @@ const Tasks = (() => {
         rolesView: null,
         quadrantsView: null,
         reviewInput: null,
-        newWeekBtn: null
+        newWeekBtn: null,
+        tabRoles: null,
+        tabQuadrants: null
     };
 
     // Initialize tasks module
@@ -40,6 +42,8 @@ const Tasks = (() => {
         elements.quadrantsView = document.getElementById('quadrantsView');
         elements.reviewInput = document.getElementById('reviewInput');
         elements.newWeekBtn = document.getElementById('newWeekBtn');
+        elements.tabRoles = document.getElementById('tabRoles');
+        elements.tabQuadrants = document.getElementById('tabQuadrants');
 
         // Load saved data
         loadData();
@@ -52,25 +56,68 @@ const Tasks = (() => {
 
         // Update UI
         updateUI();
+
+        // Show roles view by default
+        showRoles();
     }
 
     // Set up event listeners
     function setupEventListeners() {
         // Add task button
-        elements.addTaskBtn?.addEventListener('click', addTask);
+        if (elements.addTaskBtn) {
+            elements.addTaskBtn.addEventListener('click', addTask);
+        }
 
         // Task input enter key
-        elements.taskInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                addTask();
-            }
-        });
+        if (elements.taskInput) {
+            elements.taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addTask();
+                }
+            });
+        }
 
         // New week button
-        elements.newWeekBtn?.addEventListener('click', startNewWeek);
+        if (elements.newWeekBtn) {
+            elements.newWeekBtn.addEventListener('click', startNewWeek);
+        }
 
         // Review input change
-        elements.reviewInput?.addEventListener('change', saveReview);
+        if (elements.reviewInput) {
+            elements.reviewInput.addEventListener('change', saveReview);
+        }
+
+        // Tab buttons
+        if (elements.tabRoles) {
+            elements.tabRoles.addEventListener('click', showRoles);
+        }
+        if (elements.tabQuadrants) {
+            elements.tabQuadrants.addEventListener('click', showQuadrants);
+        }
+    }
+
+    // Show roles view
+    function showRoles() {
+        if (elements.rolesView && elements.quadrantsView && elements.tabRoles && elements.tabQuadrants) {
+            elements.rolesView.classList.remove('hidden');
+            elements.quadrantsView.classList.add('hidden');
+            elements.tabRoles.classList.add('border-indigo-500', 'text-gray-700');
+            elements.tabRoles.classList.remove('border-transparent', 'text-gray-600');
+            elements.tabQuadrants.classList.add('border-transparent', 'text-gray-600');
+            elements.tabQuadrants.classList.remove('border-indigo-500', 'text-gray-700');
+        }
+    }
+
+    // Show quadrants view
+    function showQuadrants() {
+        if (elements.rolesView && elements.quadrantsView && elements.tabRoles && elements.tabQuadrants) {
+            elements.rolesView.classList.add('hidden');
+            elements.quadrantsView.classList.remove('hidden');
+            elements.tabQuadrants.classList.add('border-indigo-500', 'text-gray-700');
+            elements.tabQuadrants.classList.remove('border-transparent', 'text-gray-600');
+            elements.tabRoles.classList.add('border-transparent', 'text-gray-600');
+            elements.tabRoles.classList.remove('border-indigo-500', 'text-gray-700');
+        }
     }
 
     // Load data from localStorage
@@ -304,6 +351,9 @@ const Tasks = (() => {
         // Clear views
         elements.rolesView.innerHTML = '';
         elements.quadrantsView.innerHTML = '';
+
+        // Get current roles
+        const roles = Roles.getRoles();
 
         // Group tasks by role
         const tasksByRole = {};
@@ -646,7 +696,9 @@ const Tasks = (() => {
         saveReview,
         startNewWeek,
         exportMetrics,
-        exportTasks
+        exportTasks,
+        showRoles,
+        showQuadrants
     };
 })();
 

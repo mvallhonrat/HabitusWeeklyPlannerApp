@@ -156,12 +156,15 @@ const Translations = (() => {
         init,
         setLanguage,
         getTranslation,
-        loadTranslations
+        loadTranslations,
+        updateInspirationalQuote
     };
 })();
 
 // Initialize translations when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     Translations.init();
-    Translations.loadTranslations();
+    await Translations.loadTranslations();
+    // Load and display initial verse
+    await Translations.updateInspirationalQuote();
 });
