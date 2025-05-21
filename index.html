@@ -345,24 +345,47 @@ window.onerror = function(msg, url, lineNo, columnNo, error) {
     return false;
 };
 
+// Load JSON data
+async function loadJSONData(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to load ${url}`);
+        return await response.json();
+    } catch (error) {
+        console.error(`Error loading ${url}:`, error);
+        throw error;
+    }
+}
+
 // Initialize application
 async function initApp() {
     try {
         console.log('Starting application initialization...');
         
-        // Load passages first
+        // Load translations and passages first
         try {
-            const response = await fetch('passages.json');
-            if (!response.ok) throw new Error('Failed to load passages');
-            const passages = await response.json();
+            const [translations, passages] = await Promise.all([
+                loadJSONData('translations.json'),
+                loadJSONData('passages.json')
+            ]);
+            
+            // Set translations data
+            const translationsData = document.getElementById('translations-data');
+            if (translationsData) {
+                translationsData.textContent = JSON.stringify(translations);
+            }
+            
+            // Set passages data
             const passagesData = document.getElementById('passages-data');
             if (passagesData) {
                 passagesData.textContent = JSON.stringify(passages);
-                console.log('Passages loaded successfully');
             }
+            
+            console.log('Data loaded successfully');
         } catch (error) {
-            console.error('Error loading passages:', error);
-            App.showNotification('Error loading inspirational quotes', 'error');
+            console.error('Error loading data:', error);
+            App.showNotification('Error loading application data', 'error');
+            return; // Don't proceed if data loading fails
         }
         
         // Initialize App module
@@ -450,7 +473,9 @@ document.addEventListener('DOMContentLoaded', initApp);
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('service-worker.js');
+            const registration = await navigator.serviceWorker.register('./service-worker.js', {
+                scope: './'
+            });
             console.log('ServiceWorker registration successful:', registration);
         } catch (err) {
             console.error('ServiceWorker registration failed:', err);

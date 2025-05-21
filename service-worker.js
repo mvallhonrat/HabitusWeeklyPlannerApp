@@ -1,17 +1,18 @@
 const CACHE_NAME = 'habitus-v1.0.3';
+const BASE_PATH = '/HabitusWeeklyPlannerApp/';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/tasks.js',
-  '/roles.js',
-  '/translations.js',
-  '/translations.json',
-  '/passages.json',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-514x5154.png',
+  BASE_PATH,
+  BASE_PATH + 'index.html',
+  BASE_PATH + 'styles.css',
+  BASE_PATH + 'app.js',
+  BASE_PATH + 'tasks.js',
+  BASE_PATH + 'roles.js',
+  BASE_PATH + 'translations.js',
+  BASE_PATH + 'translations.json',
+  BASE_PATH + 'passages.json',
+  BASE_PATH + 'manifest.json',
+  BASE_PATH + 'icons/icon-192x192.png',
+  BASE_PATH + 'icons/icon-514x5154.png',
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/chart.js@3'
 ];
@@ -53,38 +54,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache if not a success response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            const responseToCache = response.clone();
-
-            // Cache the fetched response
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
+  // Handle GitHub Pages paths
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith(BASE_PATH)) {
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          if (response) {
             return response;
-          })
-          .catch((error) => {
-            console.error('Fetch failed:', error);
-            // Return a fallback response for HTML requests
-            if (event.request.headers.get('accept').includes('text/html')) {
-              return caches.match('/index.html');
-            }
-            throw error;
-          });
-      })
-  );
+          }
+          return fetch(event.request)
+            .then((response) => {
+              // Don't cache if not a success response
+              if (!response || response.status !== 200 || response.type !== 'basic') {
+                return response;
+              }
+
+              // Clone the response
+              const responseToCache = response.clone();
+
+              // Cache the fetched response
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(event.request, responseToCache);
+                });
+
+              return response;
+            })
+            .catch((error) => {
+              console.error('Fetch failed:', error);
+              // Return a fallback response for HTML requests
+              if (event.request.headers.get('accept').includes('text/html')) {
+                return caches.match(BASE_PATH + 'index.html');
+              }
+              throw error;
+            });
+        })
+    );
+  }
 }); 

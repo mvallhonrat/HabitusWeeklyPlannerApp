@@ -702,11 +702,25 @@ const Tasks = (() => {
         const completionPercentages = metrics.map(m => 
             m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0
         );
-        const q1Counts = metrics.map(m => m.quadrants[0]);
-        const q2Counts = metrics.map(m => m.quadrants[1]);
-        const q3Counts = metrics.map(m => m.quadrants[2]);
-        const q4Counts = metrics.map(m => m.quadrants[3]);
-        const activeRoles = metrics.map(m => m.activeRoles);
+        
+        // Safely get quadrant counts with fallback to zeros
+        const getQuadrantCounts = (m) => {
+            if (!m.quadrants || !Array.isArray(m.quadrants)) {
+                return [0, 0, 0, 0];
+            }
+            return [
+                m.quadrants[0] || 0,
+                m.quadrants[1] || 0,
+                m.quadrants[2] || 0,
+                m.quadrants[3] || 0
+            ];
+        };
+
+        const q1Counts = metrics.map(m => getQuadrantCounts(m)[0]);
+        const q2Counts = metrics.map(m => getQuadrantCounts(m)[1]);
+        const q3Counts = metrics.map(m => getQuadrantCounts(m)[2]);
+        const q4Counts = metrics.map(m => getQuadrantCounts(m)[3]);
+        const activeRoles = metrics.map(m => m.activeRoles || 0);
 
         return {
             labels,
