@@ -364,53 +364,30 @@ async function initApp() {
     try {
         console.log('Starting application initialization...');
         
-        // Load translations and passages first
-        let translations, passages;
-        try {
-            [translations, passages] = await Promise.all([
-                loadJSONData('translations.json'),
-                loadJSONData('passages.json')
-            ]);
-            
-            // Set translations data
-            const translationsData = document.getElementById('translations-data');
-            if (translationsData) {
-                translationsData.textContent = JSON.stringify(translations);
-            }
-            
-            // Set passages data
-            const passagesData = document.getElementById('passages-data');
-            if (passagesData) {
-                passagesData.textContent = JSON.stringify(passages);
-            }
-            
-            // Update quote immediately after loading passages
-            if (passages) {
-                await Translations.updateInspirationalQuote();
-            }
-            
-            console.log('Data loaded successfully');
-        } catch (error) {
-            console.error('Error loading data:', error);
-            App.showNotification('Error loading application data', 'error');
-            return; // Don't proceed if data loading fails
-        }
+        // Initialize translations first
+        await Translations.init();
         
         // Initialize App module
         await App.init();
         
-        // Initialize language switch
+        // Set up language switch
         const langSwitch = document.getElementById('langSwitch');
         if (langSwitch) {
             // Set initial state based on saved language
-            const savedLang = localStorage.getItem('habitus_lang') || 'es';
+            const savedLang = Translations.getCurrentLanguage();
             langSwitch.classList.toggle('active', savedLang === 'en');
             
+            // Add click event listener
             langSwitch.addEventListener('click', async () => {
-                const currentLang = Translations.getCurrentLanguage();
-                const newLang = currentLang === 'es' ? 'en' : 'es';
-                await Translations.setLanguage(newLang);
-                langSwitch.classList.toggle('active');
+                try {
+                    const currentLang = Translations.getCurrentLanguage();
+                    const newLang = currentLang === 'es' ? 'en' : 'es';
+                    await Translations.setLanguage(newLang);
+                    console.log(`Language switched to: ${newLang}`);
+                } catch (error) {
+                    console.error('Error switching language:', error);
+                    App.showNotification('Error switching language', 'error');
+                }
             });
         }
         
