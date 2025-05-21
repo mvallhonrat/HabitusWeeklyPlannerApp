@@ -131,7 +131,7 @@ const Tasks = (() => {
         if (storedTasks) tasks = JSON.parse(storedTasks);
         if (storedMetrics) metrics = JSON.parse(storedMetrics);
         if (storedTasksLog) tasksLog = JSON.parse(storedTasksLog);
-        if (storedLastReview) lastReviewText = JSON.parse(storedLastReview);
+        if (storedLastReview) lastReviewText = storedLastReview;
         if (storedLastReset) lastResetTime = parseInt(storedLastReset);
 
         // Show last review if exists
@@ -150,7 +150,7 @@ const Tasks = (() => {
         localStorage.setItem('habitus_tasks', JSON.stringify(tasks));
         localStorage.setItem('habitus_metrics', JSON.stringify(metrics));
         localStorage.setItem('habitus_tasksLog', JSON.stringify(tasksLog));
-        localStorage.setItem('habitus_lastReview', JSON.stringify(lastReviewText));
+        localStorage.setItem('habitus_lastReview', lastReviewText);
         localStorage.setItem('habitus_lastReset', JSON.stringify(lastResetTime));
     }
 
@@ -342,6 +342,7 @@ const Tasks = (() => {
         updateMetrics();
         updateCharts();
         updateHistoricalCharts();
+        setupDragAndDrop();
     }
 
     // Render tasks
@@ -368,7 +369,7 @@ const Tasks = (() => {
             roleSection.className = 'mb-4';
             roleSection.innerHTML = `
                 <h3 class="text-lg font-semibold mb-2">${role}</h3>
-                <div class="space-y-2" id="role-${role}">
+                <div class="space-y-2 min-h-[50px] p-2 rounded transition-colors" id="role-${role}">
                     ${roleTasks.length === 0 ? 
                         `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
                         roleTasks.map(task => createTaskElement(task)).join('')
@@ -379,13 +380,20 @@ const Tasks = (() => {
         });
 
         // Render quadrants view
+        const quadrantLabels = {
+            '1': 'QI',
+            '2': 'QII',
+            '3': 'QIII',
+            '4': 'QIV'
+        };
+
         for (let quadrant = 1; quadrant <= 4; quadrant++) {
             const quadrantTasks = tasks.filter(task => task.quadrant === quadrant.toString());
             const quadrantSection = document.createElement('div');
             quadrantSection.className = 'mb-4';
             quadrantSection.innerHTML = `
-                <h3 class="text-lg font-semibold mb-2">${Translations.getTranslation(`quadrant_${quadrant}`)}</h3>
-                <div class="space-y-2" id="quadrant-${quadrant}">
+                <h3 class="text-lg font-semibold mb-2">${quadrantLabels[quadrant]}</h3>
+                <div class="space-y-2 min-h-[50px] p-2 rounded transition-colors" id="quadrant-${quadrant}">
                     ${quadrantTasks.length === 0 ? 
                         `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
                         quadrantTasks.map(task => createTaskElement(task)).join('')
@@ -398,23 +406,130 @@ const Tasks = (() => {
 
     // Create task element
     function createTaskElement(task) {
+        const quadrantColors = {
+            '1': 'bg-red-50 border-red-200',
+            '2': 'bg-green-50 border-green-200',
+            '3': 'bg-yellow-50 border-yellow-200',
+            '4': 'bg-gray-50 border-gray-200'
+        };
+
+        const quadrantTextColors = {
+            '1': 'text-red-700',
+            '2': 'text-green-700',
+            '3': 'text-yellow-700',
+            '4': 'text-gray-700'
+        };
+
+        const quadrantBorderColors = {
+            '1': 'border-l-4 border-red-500',
+            '2': 'border-l-4 border-green-500',
+            '3': 'border-l-4 border-yellow-500',
+            '4': 'border-l-4 border-gray-500'
+        };
+
+        const quadrantLabels = {
+            '1': 'QI',
+            '2': 'QII',
+            '3': 'QIII',
+            '4': 'QIV'
+        };
+
         return `
-            <div class="flex items-center justify-between bg-white p-2 rounded shadow-sm" draggable="true" data-task-id="${task.id}">
-                <div class="flex items-center space-x-2">
+            <div class="task-item flex items-center justify-between ${quadrantColors[task.quadrant]} ${quadrantBorderColors[task.quadrant]} p-3 rounded shadow-sm mb-2" 
+                 draggable="true" 
+                 data-task-id="${task.id}"
+                 data-role="${task.role}"
+                 data-quadrant="${task.quadrant}">
+                <div class="flex items-center space-x-3 flex-1">
+                    <span class="drag-handle cursor-move text-gray-400 hover:text-gray-600">⋮⋮</span>
                     <input type="checkbox" 
                            class="form-checkbox h-4 w-4 text-indigo-600" 
                            ${task.completed ? 'checked' : ''} 
                            onchange="Tasks.toggleTaskComplete('${task.id}')">
-                    <span class="text-sm ${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</span>
+                    <span class="text-sm ${task.completed ? 'line-through text-gray-500' : quadrantTextColors[task.quadrant]}">${task.description}</span>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <span class="text-xs text-gray-500">${task.role}</span>
+                    <span class="text-xs px-2 py-1 rounded-full ${quadrantColors[task.quadrant]} ${quadrantTextColors[task.quadrant]}">${quadrantLabels[task.quadrant]}</span>
                     <button onclick="Tasks.deleteTask('${task.id}')" class="text-red-500 hover:text-red-700">
                         🗑️
                     </button>
                 </div>
             </div>
         `;
+    }
+
+    // Set up drag and drop
+    function setupDragAndDrop() {
+        const taskItems = document.querySelectorAll('.task-item');
+        const dropZones = document.querySelectorAll('#rolesView > div > div, #quadrantsView > div > div');
+
+        taskItems.forEach(item => {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+        });
+
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', handleDragOver);
+            zone.addEventListener('dragleave', handleDragLeave);
+            zone.addEventListener('drop', handleDrop);
+        });
+    }
+
+    // Handle drag start
+    function handleDragStart(e) {
+        e.target.classList.add('opacity-50', 'dragging');
+        e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    // Handle drag end
+    function handleDragEnd(e) {
+        e.target.classList.remove('opacity-50', 'dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    }
+
+    // Handle drag over
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
+        if (dropZone) {
+            dropZone.classList.add('drag-over', 'bg-gray-100');
+        }
+    }
+
+    // Handle drag leave
+    function handleDragLeave(e) {
+        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
+        if (dropZone) {
+            dropZone.classList.remove('drag-over', 'bg-gray-100');
+        }
+    }
+
+    // Handle drop
+    function handleDrop(e) {
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('text/plain');
+        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
+        
+        if (dropZone && taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                // Update task based on drop zone
+                if (dropZone.id.startsWith('role-')) {
+                    const newRole = dropZone.id.replace('role-', '');
+                    task.role = newRole;
+                } else if (dropZone.id.startsWith('quadrant-')) {
+                    const newQuadrant = dropZone.id.replace('quadrant-', '');
+                    task.quadrant = newQuadrant;
+                }
+                
+                saveData();
+                updateUI();
+            }
+        }
+        
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over', 'bg-gray-100'));
     }
 
     // Add a new task
@@ -496,6 +611,34 @@ const Tasks = (() => {
 
     // Start new week
     function startNewWeek() {
+        // Check if a week has passed since last reset
+        if (lastResetTime) {
+            const oneWeekInMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+            const timeSinceLastReset = Date.now() - lastResetTime;
+            
+            if (timeSinceLastReset < oneWeekInMs) {
+                const daysLeft = Math.ceil((oneWeekInMs - timeSinceLastReset) / (24 * 60 * 60 * 1000));
+                const message = Translations.getCurrentLanguage() === 'es' 
+                    ? `Han pasado menos de 7 días desde la última vez. ¿Estás seguro de que quieres empezar una nueva semana? (Faltan ${daysLeft} días)`
+                    : `Less than 7 days have passed since last time. Are you sure you want to start a new week? (${daysLeft} days left)`;
+                
+                if (!confirm(message)) {
+                    return;
+                }
+            }
+        }
+
+        // Save current review text as last review if it exists
+        if (elements.reviewInput && elements.reviewInput.value.trim()) {
+            lastReviewText = elements.reviewInput.value.trim();
+            const lastReviewBox = document.getElementById('lastReviewBox');
+            const lastReviewSpan = document.getElementById('lastReviewText');
+            if (lastReviewBox && lastReviewSpan) {
+                lastReviewBox.classList.remove('hidden');
+                lastReviewSpan.textContent = lastReviewText;
+            }
+        }
+
         // Save current week's data
         const weekMetrics = {
             timestamp: Date.now(),
@@ -508,13 +651,20 @@ const Tasks = (() => {
 
         // Log completed tasks
         const completedTasks = tasks.filter(t => t.completed);
-        tasksLog.push({
-            timestamp: Date.now(),
-            tasks: completedTasks
-        });
+        if (completedTasks.length > 0) {
+            tasksLog.push({
+                timestamp: Date.now(),
+                tasks: completedTasks
+            });
+        }
 
         // Remove completed tasks
         tasks = tasks.filter(t => !t.completed);
+
+        // Clear review input
+        if (elements.reviewInput) {
+            elements.reviewInput.value = '';
+        }
 
         // Update last reset time
         lastResetTime = Date.now();

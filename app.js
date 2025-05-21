@@ -15,29 +15,43 @@ const App = (() => {
     };
 
     // Initialize application
-    function init() {
-        // Cache DOM elements
-        elements.themeToggle = document.getElementById('themeToggle');
-        elements.instructionsToggle = document.getElementById('instructionsToggle');
-        elements.instructionsContent = document.getElementById('instructionsContent');
+    async function init() {
+        try {
+            console.log('Initializing App module...');
+            
+            // Cache DOM elements
+            elements.themeToggle = document.getElementById('themeToggle');
+            elements.instructionsToggle = document.getElementById('instructionsToggle');
+            elements.instructionsContent = document.getElementById('instructionsContent');
 
-        // Load theme preference
-        loadThemePreference();
+            // Load theme preference
+            loadThemePreference();
 
-        // Set up event listeners
-        setupEventListeners();
+            // Set up event listeners
+            setupEventListeners();
 
-        // Initialize modules
-        Translations.init();
-        Roles.init();
-        Tasks.init();
+            // Initialize modules in sequence
+            console.log('Initializing Translations module...');
+            await Translations.init();
+            
+            console.log('Initializing Roles module...');
+            await Roles.init();
+            
+            console.log('Initializing Tasks module...');
+            await Tasks.init();
 
-        // Show last review if exists
-        showLastReview();
+            // Show last review if exists
+            showLastReview();
 
-        // Show offline status if needed
-        if (!isOnline) {
-            showOfflineStatus();
+            // Show offline status if needed
+            if (!isOnline) {
+                showOfflineStatus();
+            }
+
+            console.log('App initialization complete');
+        } catch (error) {
+            console.error('Error during App initialization:', error);
+            showNotification('Error initializing application. Please refresh the page.', 'error');
         }
     }
 
@@ -171,6 +185,11 @@ const App = (() => {
 })();
 
 // Initialize application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    App.init();
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        console.log('DOM Content Loaded - Starting initialization...');
+        await App.init();
+    } catch (error) {
+        console.error('Error during DOM initialization:', error);
+    }
 }); 
