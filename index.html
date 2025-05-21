@@ -458,8 +458,8 @@ document.addEventListener('DOMContentLoaded', initApp);
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('./service-worker.js', {
-                scope: './'
+            const registration = await navigator.serviceWorker.register(`${window.location.pathname}service-worker.js`, {
+                scope: window.location.pathname
             });
             console.log('ServiceWorker registration successful:', registration);
         } catch (err) {

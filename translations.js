@@ -7,6 +7,7 @@ const Translations = (() => {
     let translations = {};
     let currentLanguage = 'es';
     let isInitialized = false;
+    const BASE_PATH = '/HabitusWeeklyPlannerApp/';
 
     // DOM Elements
     const elements = {
@@ -22,19 +23,44 @@ const Translations = (() => {
             
             // Try to fetch translations directly first
             try {
-                const response = await fetch('translations.json');
-                if (!response.ok) throw new Error('Failed to fetch translations');
-                translations = await response.json();
+                const response = await fetch(`${BASE_PATH}translations.json`);
+                if (!response.ok) {
+                    // Try without base path as fallback
+                    const fallbackResponse = await fetch('translations.json');
+                    if (!fallbackResponse.ok) throw new Error('Failed to fetch translations');
+                    translations = await fallbackResponse.json();
+                } else {
+                    translations = await response.json();
+                }
                 console.log('Translations loaded from fetch');
             } catch (fetchError) {
                 console.warn('Error fetching translations:', fetchError);
                 
                 // Fallback to data element
                 if (elements.translationsData && elements.translationsData.textContent) {
-                    translations = JSON.parse(elements.translationsData.textContent);
-                    console.log('Translations loaded from data element');
+                    try {
+                        translations = JSON.parse(elements.translationsData.textContent);
+                        console.log('Translations loaded from data element');
+                    } catch (parseError) {
+                        console.error('Error parsing translations from data element:', parseError);
+                        throw new Error('Invalid translations data format');
+                    }
                 } else {
-                    throw new Error('No translations data available');
+                    // Last resort: try to load from script tag
+                    const scriptElement = document.querySelector('script[src*="translations.json"]');
+                    if (scriptElement) {
+                        try {
+                            const response = await fetch(scriptElement.src);
+                            if (!response.ok) throw new Error('Failed to fetch translations from script tag');
+                            translations = await response.json();
+                            console.log('Translations loaded from script tag');
+                        } catch (scriptError) {
+                            console.error('Error loading translations from script tag:', scriptError);
+                            throw new Error('No translations data available');
+                        }
+                    } else {
+                        throw new Error('No translations data available');
+                    }
                 }
             }
             
@@ -212,9 +238,15 @@ const Translations = (() => {
             
             // Try to fetch passages directly first
             try {
-                const response = await fetch('passages.json');
-                if (!response.ok) throw new Error('Failed to fetch passages');
-                passages = await response.json();
+                const response = await fetch(`${BASE_PATH}passages.json`);
+                if (!response.ok) {
+                    // Try without base path as fallback
+                    const fallbackResponse = await fetch('passages.json');
+                    if (!fallbackResponse.ok) throw new Error('Failed to fetch passages');
+                    passages = await fallbackResponse.json();
+                } else {
+                    passages = await response.json();
+                }
                 console.log('Passages loaded from fetch');
             } catch (fetchError) {
                 console.warn('Error fetching passages:', fetchError);
@@ -222,8 +254,27 @@ const Translations = (() => {
                 // Fallback to data element
                 const passagesData = document.getElementById('passages-data');
                 if (passagesData && passagesData.textContent) {
-                    passages = JSON.parse(passagesData.textContent);
-                    console.log('Passages loaded from data element');
+                    try {
+                        passages = JSON.parse(passagesData.textContent);
+                        console.log('Passages loaded from data element');
+                    } catch (parseError) {
+                        console.error('Error parsing passages from data element:', parseError);
+                        // Last resort: try to load from script tag
+                        const scriptElement = document.querySelector('script[src*="passages.json"]');
+                        if (scriptElement) {
+                            try {
+                                const response = await fetch(scriptElement.src);
+                                if (!response.ok) throw new Error('Failed to fetch passages from script tag');
+                                passages = await response.json();
+                                console.log('Passages loaded from script tag');
+                            } catch (scriptError) {
+                                console.error('Error loading passages from script tag:', scriptError);
+                                throw new Error('No passages data available');
+                            }
+                        } else {
+                            throw new Error('No passages data available');
+                        }
+                    }
                 } else {
                     throw new Error('No passages data available');
                 }
