@@ -219,51 +219,36 @@ const Translations = (() => {
     // Update inspirational quote
     async function updateInspirationalQuote() {
         try {
-            if (!isInitialized) {
-                await init();
+            if (!elements.quoteContainer) {
+                console.warn('Quote container element not found');
+                return;
             }
 
-            console.log('Updating inspirational quote...');
-            let passages = window.PASAJES_BILINGUES;
-
+            // Get passages from the global variable
+            const passages = window.PASAJES_BILINGUES;
             if (!passages || !passages[currentLanguage] || !passages[currentLanguage].length) {
-                passages = {
-                    es: [{
-                        contenido: "Porque yo sé los planes que tengo para ti, dice el Señor, planes de bienestar y no de calamidad, para darte un futuro y una esperanza.",
-                        pasaje: "Jeremías 29:11"
-                    }],
-                    en: [{
-                        contenido: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.",
-                        pasaje: "Jeremiah 29:11"
-                    }]
-                };
-                console.log('Using default passage');
+                throw new Error('No passages available for current language');
             }
 
-            const languagePassages = passages[currentLanguage] || passages.es;
+            // Get random passage
+            const languagePassages = passages[currentLanguage];
             const randomIndex = Math.floor(Math.random() * languagePassages.length);
             const passage = languagePassages[randomIndex];
 
-            if (elements.quoteContainer) {
-                elements.quoteContainer.innerHTML = `
-                    <div class="bg-white rounded-lg shadow-sm p-4">
-                        <p class="text-lg font-medium text-gray-800">${passage.contenido}</p>
-                        <p class="text-sm text-gray-600 mt-2 italic">${passage.pasaje}</p>
-                    </div>
-                `;
-                console.log('Inspirational quote updated successfully');
-            } else {
-                console.warn('Quote container element not found');
-            }
+            // Update the UI
+            elements.quoteContainer.innerHTML = `
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <p class="text-lg font-medium text-gray-800">${passage.contenido}</p>
+                    <p class="text-sm text-gray-600 mt-2 italic">${passage.pasaje}</p>
+                </div>
+            `;
+            console.log('Inspirational quote updated successfully');
         } catch (error) {
             console.error('Error updating inspirational quote:', error);
             if (elements.quoteContainer) {
-                const errorMessage = currentLanguage === 'es' 
-                    ? 'Error al cargar el versículo'
-                    : 'Error loading verse';
                 elements.quoteContainer.innerHTML = `
                     <div class="bg-white rounded-lg shadow-sm p-4">
-                        <p class="text-lg font-medium text-gray-800">${errorMessage}</p>
+                        <p class="text-lg font-medium text-gray-800">${getTranslation('error_loading_quote')}</p>
                         <p class="text-sm text-gray-600 mt-2 italic">${error.message}</p>
                     </div>
                 `;
