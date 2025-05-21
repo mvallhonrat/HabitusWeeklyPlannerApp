@@ -30,10 +30,9 @@
 </div>
 <div class="mb-6" id="pasaje-inspirador">
     <div class="text-gray-700 text-center mt-2" id="verso-contenedor">
-        <!-- The inspirational quote will be loaded here dynamically -->
         <div class="bg-white rounded-lg shadow-sm p-4">
-            <p class="text-lg font-medium text-gray-800">Cargando versículo...</p>
-            <p class="text-sm text-gray-600 mt-2 italic">Por favor espera...</p>
+            <p class="text-lg font-medium text-gray-800" data-i18n="loading_quote">Cargando versículo...</p>
+            <p class="text-sm text-gray-600 mt-2 italic" data-i18n="loading_quote_sub">Por favor espera...</p>
         </div>
     </div>
 </div></div><script src="https://cdn.tailwindcss.com"></script>
@@ -348,9 +347,12 @@ window.onerror = function(msg, url, lineNo, columnNo, error) {
 // Load JSON data
 async function loadJSONData(url) {
     try {
+        console.log(`Loading ${url}...`);
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to load ${url}`);
-        return await response.json();
+        const data = await response.json();
+        console.log(`Successfully loaded ${url}`);
+        return data;
     } catch (error) {
         console.error(`Error loading ${url}:`, error);
         throw error;
@@ -363,8 +365,9 @@ async function initApp() {
         console.log('Starting application initialization...');
         
         // Load translations and passages first
+        let translations, passages;
         try {
-            const [translations, passages] = await Promise.all([
+            [translations, passages] = await Promise.all([
                 loadJSONData('translations.json'),
                 loadJSONData('passages.json')
             ]);
@@ -379,6 +382,11 @@ async function initApp() {
             const passagesData = document.getElementById('passages-data');
             if (passagesData) {
                 passagesData.textContent = JSON.stringify(passages);
+            }
+            
+            // Update quote immediately after loading passages
+            if (passages) {
+                await Translations.updateInspirationalQuote();
             }
             
             console.log('Data loaded successfully');
