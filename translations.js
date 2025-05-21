@@ -224,33 +224,8 @@ const Translations = (() => {
             }
 
             console.log('Updating inspirational quote...');
-            let passages = null;
+            let passages = window.PASAJES_BILINGUES;
 
-            // Try to load from data element first
-            const passagesData = document.getElementById('passages-data');
-            if (passagesData && passagesData.textContent) {
-                try {
-                    passages = JSON.parse(passagesData.textContent);
-                    console.log('Passages loaded from data element');
-                } catch (error) {
-                    console.warn('Error loading passages from data element:', error);
-                }
-            }
-
-            // If data element failed, try to load from file
-            if (!passages) {
-                try {
-                    const response = await fetch('passages.json');
-                    if (response.ok) {
-                        passages = await response.json();
-                        console.log('Passages loaded from file');
-                    }
-                } catch (error) {
-                    console.warn('Error loading passages from file:', error);
-                }
-            }
-
-            // If both attempts failed, use default passage
             if (!passages || !passages[currentLanguage] || !passages[currentLanguage].length) {
                 passages = {
                     es: [{
