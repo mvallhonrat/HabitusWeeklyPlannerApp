@@ -189,9 +189,37 @@ const Translations = (() => {
                 throw new Error('Passages data element not found');
             }
 
-            const passages = JSON.parse(passagesData.textContent);
-            const passage = passages[currentLanguage][Math.floor(Math.random() * passages[currentLanguage].length)];
+            let passages;
+            try {
+                passages = JSON.parse(passagesData.textContent);
+                if (!passages || !passages[currentLanguage] || !Array.isArray(passages[currentLanguage])) {
+                    throw new Error('Invalid passages data format');
+                }
+            } catch (error) {
+                console.error('Error parsing passages:', error);
+                // Try to fetch passages directly
+                try {
+                    const response = await fetch('passages.json');
+                    if (!response.ok) throw new Error('Failed to fetch passages');
+                    passages = await response.json();
+                    if (!passages || !passages[currentLanguage] || !Array.isArray(passages[currentLanguage])) {
+                        throw new Error('Invalid passages data format');
+                    }
+                } catch (fetchError) {
+                    console.error('Error fetching passages:', fetchError);
+                    throw new Error('Could not load passages data');
+                }
+            }
+
+            // Get a random passage for the current language
+            const languagePassages = passages[currentLanguage];
+            const randomIndex = Math.floor(Math.random() * languagePassages.length);
+            const passage = languagePassages[randomIndex];
             
+            if (!passage || !passage.contenido || !passage.pasaje) {
+                throw new Error('Invalid passage format');
+            }
+
             const quoteContainer = document.getElementById('verso-contenedor');
             if (quoteContainer) {
                 quoteContainer.innerHTML = `
@@ -206,7 +234,15 @@ const Translations = (() => {
             }
         } catch (error) {
             console.error('Error updating inspirational quote:', error);
-            throw error;
+            const quoteContainer = document.getElementById('verso-contenedor');
+            if (quoteContainer) {
+                quoteContainer.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <p class="text-lg font-medium text-gray-800">${Translations.getTranslation('error_loading_quote')}</p>
+                        <p class="text-sm text-gray-600 mt-2 italic">${error.message}</p>
+                    </div>
+                `;
+            }
         }
     }
 
