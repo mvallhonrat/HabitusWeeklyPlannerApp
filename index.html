@@ -326,19 +326,16 @@
     🔄 Migrar Datos Existentes
   </button>
 </div>
-<!-- Load scripts in correct order -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
-
 <!-- Create hidden data elements -->
 <div id="translations-data" style="display: none;"></div>
 <div id="passages-data" style="display: none;"></div>
 
-<script src="pasajes_bilingues.js"></script>
-<script src="translations.js"></script>
-<script src="roles.js"></script>
-<script src="tasks.js"></script>
-<script src="app.js"></script>
+<!-- Load scripts in correct order with defer -->
+<script src="pasajes_bilingues.js" defer></script>
+<script src="translations.js" defer></script>
+<script src="roles.js" defer></script>
+<script src="tasks.js" defer></script>
+<script src="app.js" defer></script>
 
 <script>
 // Global error handler
@@ -347,27 +344,30 @@ window.onerror = function(msg, url, lineNo, columnNo, error) {
     return false;
 };
 
-// Load JSON data
-async function loadJSONData(url) {
-    try {
-        console.log(`Loading data from ${url}...`);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to load ${url}: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log(`Successfully loaded ${url}`);
-        return data;
-    } catch (error) {
-        console.error(`Error loading ${url}:`, error);
-        throw error;
-    }
-}
-
 // Initialize application
 async function initApp() {
     try {
         console.log('Starting application initialization...');
+        
+        // Wait for all scripts to load
+        await Promise.all([
+            new Promise(resolve => {
+                if (document.readyState === 'complete') resolve();
+                else window.addEventListener('load', resolve);
+            }),
+            // Ensure pasajes_bilingues.js is loaded
+            new Promise(resolve => {
+                if (window.PASAJES_BILINGUES) resolve();
+                else {
+                    const checkInterval = setInterval(() => {
+                        if (window.PASAJES_BILINGUES) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                }
+            })
+        ]);
         
         // Initialize App module
         await App.init();
@@ -432,10 +432,7 @@ async function migrateData() {
 }
 
 // Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    // Add a small delay to ensure all scripts are loaded
-    setTimeout(initApp, 100);
-});
+document.addEventListener('DOMContentLoaded', initApp);
 
 // Register service worker
 if ('serviceWorker' in navigator) {
