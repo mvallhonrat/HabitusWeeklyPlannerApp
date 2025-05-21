@@ -11,7 +11,8 @@ const App = (() => {
     const elements = {
         themeToggle: null,
         instructionsToggle: null,
-        instructionsContent: null
+        instructionsContent: null,
+        quoteContainer: null
     };
 
     // Initialize application
@@ -23,6 +24,17 @@ const App = (() => {
             elements.themeToggle = document.getElementById('themeToggle');
             elements.instructionsToggle = document.getElementById('instructionsToggle');
             elements.instructionsContent = document.getElementById('instructionsContent');
+            elements.quoteContainer = document.getElementById('verso-contenedor');
+
+            // Show initial loading state
+            if (elements.quoteContainer) {
+                elements.quoteContainer.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <p class="text-lg font-medium text-gray-800">Cargando aplicación...</p>
+                        <p class="text-sm text-gray-600 mt-2 italic">Por favor espera...</p>
+                    </div>
+                `;
+            }
 
             // Load theme preference
             loadThemePreference();
@@ -51,7 +63,15 @@ const App = (() => {
             console.log('App initialization complete');
         } catch (error) {
             console.error('Error during App initialization:', error);
-            showNotification('Error initializing application. Please refresh the page.', 'error');
+            if (elements.quoteContainer) {
+                elements.quoteContainer.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <p class="text-lg font-medium text-gray-800">Error al inicializar la aplicación</p>
+                        <p class="text-sm text-gray-600 mt-2 italic">Por favor, recarga la página</p>
+                    </div>
+                `;
+            }
+            throw error;
         }
     }
 
@@ -184,12 +204,9 @@ const App = (() => {
     };
 })();
 
-// Initialize application when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        console.log('DOM Content Loaded - Starting initialization...');
-        await App.init();
-    } catch (error) {
-        console.error('Error during DOM initialization:', error);
-    }
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    App.init().catch(error => {
+        console.error('Failed to initialize application:', error);
+    });
 }); 

@@ -369,37 +369,8 @@ async function initApp() {
     try {
         console.log('Starting application initialization...');
         
-        // Initialize App module first
-        try {
-            await App.init();
-            console.log('App module initialized successfully');
-        } catch (error) {
-            console.error('Error initializing App module:', error);
-            throw error;
-        }
-        
-        // Initialize language switch and translations
-        const langSwitch = document.getElementById('langSwitch');
-        if (langSwitch) {
-            // Set initial state based on saved language
-            const savedLang = localStorage.getItem('habitus_lang') || 'es';
-            langSwitch.classList.toggle('active', savedLang === 'en');
-            
-            // Initialize translations and update verse
-            await Translations.init();
-            await Translations.setLanguage(savedLang);
-            
-            langSwitch.addEventListener('click', async () => {
-                try {
-                    const currentLang = Translations.getCurrentLanguage();
-                    const newLang = currentLang === 'es' ? 'en' : 'es';
-                    await Translations.setLanguage(newLang);
-                    langSwitch.classList.toggle('active');
-                } catch (error) {
-                    console.error('Error switching language:', error);
-                }
-            });
-        }
+        // Initialize App module
+        await App.init();
         
         // Set up export buttons
         document.getElementById('exportMetricsBtn')?.addEventListener('click', Tasks.exportMetrics);
@@ -411,16 +382,6 @@ async function initApp() {
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Error initializing application:', error);
-        // Show error message to user
-        const quoteContainer = document.getElementById('verso-contenedor');
-        if (quoteContainer) {
-            quoteContainer.innerHTML = `
-                <div class="bg-white rounded-lg shadow-sm p-4">
-                    <p class="text-lg font-medium text-gray-800">${Translations.getTranslation('error_loading_quote')}</p>
-                    <p class="text-sm text-gray-600 mt-2 italic">${error.message}</p>
-                </div>
-            `;
-        }
     }
 }
 

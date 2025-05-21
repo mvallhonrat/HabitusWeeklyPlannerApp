@@ -36,12 +36,24 @@ const Translations = (() => {
             // Set initial language
             await setLanguage(savedLang);
             
+            // Set up language switch event listener
+            if (elements.langSwitch) {
+                elements.langSwitch.addEventListener('click', async () => {
+                    try {
+                        const currentLang = getCurrentLanguage();
+                        const newLang = currentLang === 'es' ? 'en' : 'es';
+                        await setLanguage(newLang);
+                    } catch (error) {
+                        console.error('Error switching language:', error);
+                    }
+                });
+            }
+            
             isInitialized = true;
             console.log('Translations module initialized successfully');
         } catch (error) {
             console.error('Error initializing Translations module:', error);
-            // Don't throw, just log the error and continue with defaults
-            isInitialized = true;
+            throw error; // Re-throw to prevent app initialization
         }
     }
 
@@ -97,8 +109,7 @@ const Translations = (() => {
             console.log('Using default translations');
         } catch (error) {
             console.error('Error in loadTranslations:', error);
-            // Use default translations instead of throwing
-            return translations;
+            throw error; // Re-throw to ensure proper error handling
         }
     }
 
@@ -280,9 +291,5 @@ const Translations = (() => {
     };
 })();
 
-// Initialize translations when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    Translations.init().catch(error => {
-        console.error('Failed to initialize translations:', error);
-    });
-});
+// Remove the automatic initialization on DOMContentLoaded
+// We'll let App.init() handle this
