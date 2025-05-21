@@ -1,11 +1,21 @@
 /**
  * Tasks Module
- * Handles task management for the application
+ * Handles task management functionality
  */
 const Tasks = (() => {
     // Private state
     let tasks = [];
-    let currentView = 'roles'; // 'roles' or 'quadrants'
+    let metrics = [];
+    let tasksLog = [];
+    let lastReviewText = '';
+    let lastResetTime = null;
+
+    // Chart instances
+    let chartQuadrants = null;
+    let chartCompletion = null;
+    let chartHistoricalCompletion = null;
+    let chartHistoricalQuadrants = null;
+    let chartHistoricalRoles = null;
 
     // DOM Elements
     const elements = {
@@ -15,27 +25,11 @@ const Tasks = (() => {
         addTaskBtn: null,
         rolesView: null,
         quadrantsView: null,
-        tabRoles: null,
-        tabQuadrants: null,
         reviewInput: null,
-        newWeekBtn: null,
-        exportMetricsBtn: null,
-        exportTasksBtn: null,
-        lastReviewBox: null,
-        lastReviewText: null,
-        totalTasks: null,
-        completionPercentage: null,
-        q1Count: null,
-        q2Count: null,
-        q3Count: null,
-        q4Count: null
+        newWeekBtn: null
     };
 
-    // Chart instances
-    let quadrantsChart = null;
-    let completionChart = null;
-
-    // Initialize module
+    // Initialize tasks module
     function init() {
         // Cache DOM elements
         elements.taskInput = document.getElementById('taskInput');
@@ -44,23 +38,11 @@ const Tasks = (() => {
         elements.addTaskBtn = document.getElementById('addTaskBtn');
         elements.rolesView = document.getElementById('rolesView');
         elements.quadrantsView = document.getElementById('quadrantsView');
-        elements.tabRoles = document.getElementById('tabRoles');
-        elements.tabQuadrants = document.getElementById('tabQuadrants');
         elements.reviewInput = document.getElementById('reviewInput');
         elements.newWeekBtn = document.getElementById('newWeekBtn');
-        elements.exportMetricsBtn = document.getElementById('exportMetricsBtn');
-        elements.exportTasksBtn = document.getElementById('exportTasksBtn');
-        elements.lastReviewBox = document.getElementById('lastReviewBox');
-        elements.lastReviewText = document.getElementById('lastReviewText');
-        elements.totalTasks = document.getElementById('totalTasks');
-        elements.completionPercentage = document.getElementById('completionPercentage');
-        elements.q1Count = document.getElementById('q1Count');
-        elements.q2Count = document.getElementById('q2Count');
-        elements.q3Count = document.getElementById('q3Count');
-        elements.q4Count = document.getElementById('q4Count');
 
-        // Load tasks from storage
-        loadTasks();
+        // Load saved data
+        loadData();
 
         // Set up event listeners
         setupEventListeners();
@@ -74,364 +56,156 @@ const Tasks = (() => {
 
     // Set up event listeners
     function setupEventListeners() {
-        // Add task button click
-        elements.addTaskBtn?.addEventListener('click', () => {
-            const taskData = {
-                description: elements.taskInput?.value.trim(),
-                roleId: elements.roleSelect?.value,
-                quadrant: elements.quadrantSelect?.value
-            };
-            if (taskData.description && taskData.roleId && taskData.quadrant) {
-                addTask(taskData);
-                elements.taskInput.value = '';
-                elements.roleSelect.value = '';
-                elements.quadrantSelect.value = '';
-            } else {
-                const errorMsg = Translations.getTranslation('errors.invalid_task');
-                window.dispatchEvent(new CustomEvent('showNotification', {
-                    detail: { message: errorMsg, type: 'error' }
-                }));
-            }
-        });
+        // Add task button
+        elements.addTaskBtn?.addEventListener('click', addTask);
 
-        // Add task on Enter key
+        // Task input enter key
         elements.taskInput?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                const taskData = {
-                    description: elements.taskInput.value.trim(),
-                    roleId: elements.roleSelect.value,
-                    quadrant: elements.quadrantSelect.value
-                };
-                if (taskData.description && taskData.roleId && taskData.quadrant) {
-                    addTask(taskData);
-                    elements.taskInput.value = '';
-                    elements.roleSelect.value = '';
-                    elements.quadrantSelect.value = '';
-                }
+                addTask();
             }
         });
-
-        // Tab switching
-        elements.tabRoles?.addEventListener('click', () => switchView('roles'));
-        elements.tabQuadrants?.addEventListener('click', () => switchView('quadrants'));
 
         // New week button
         elements.newWeekBtn?.addEventListener('click', startNewWeek);
 
-        // Export buttons
-        elements.exportMetricsBtn?.addEventListener('click', exportMetrics);
-        elements.exportTasksBtn?.addEventListener('click', exportTasks);
-
-        // Listen for role changes
-        window.addEventListener('roleAdded', () => updateUI());
-        window.addEventListener('roleDeleted', (e) => {
-            const { roleId } = e.detail;
-            deleteTasksByRole(roleId);
-        });
-
-        // Listen for language changes
-        window.addEventListener('languageChanged', () => {
-            updateUI();
-            updateCharts();
-        });
+        // Review input change
+        elements.reviewInput?.addEventListener('change', saveReview);
     }
 
-    // Load tasks from storage
-    function loadTasks() {
-        try {
-            const storedTasks = localStorage.getItem('tasks');
-            if (storedTasks) {
-                tasks = JSON.parse(storedTasks);
+    // Load data from localStorage
+    function loadData() {
+        const storedTasks = localStorage.getItem('habitus_tasks');
+        const storedMetrics = localStorage.getItem('habitus_metrics');
+        const storedTasksLog = localStorage.getItem('habitus_tasksLog');
+        const storedLastReview = localStorage.getItem('habitus_lastReview');
+        const storedLastReset = localStorage.getItem('habitus_lastReset');
+
+        if (storedTasks) tasks = JSON.parse(storedTasks);
+        if (storedMetrics) metrics = JSON.parse(storedMetrics);
+        if (storedTasksLog) tasksLog = JSON.parse(storedTasksLog);
+        if (storedLastReview) lastReviewText = JSON.parse(storedLastReview);
+        if (storedLastReset) lastResetTime = parseInt(storedLastReset);
+
+        // Show last review if exists
+        if (lastReviewText && lastReviewText.trim() !== '') {
+            const lastReviewBox = document.getElementById('lastReviewBox');
+            const lastReviewSpan = document.getElementById('lastReviewText');
+            if (lastReviewBox && lastReviewSpan) {
+                lastReviewBox.classList.remove('hidden');
+                lastReviewSpan.textContent = lastReviewText;
             }
-        } catch (error) {
-            console.error('Error loading tasks:', error);
-            tasks = [];
         }
     }
 
-    // Save tasks to storage
-    function saveTasks() {
-        try {
-            localStorage.setItem('tasks', JSON.stringify(tasks));
-        } catch (error) {
-            console.error('Error saving tasks:', error);
-        }
-    }
-
-    // Add a new task
-    function addTask(taskData) {
-        // Create new task
-        const newTask = {
-            id: Date.now().toString(),
-            description: taskData.description,
-            roleId: taskData.roleId,
-            quadrant: parseInt(taskData.quadrant),
-            completed: false,
-            createdAt: new Date().toISOString()
-        };
-
-        // Add to tasks array
-        tasks.push(newTask);
-
-        // Save to storage
-        saveTasks();
-
-        // Update UI
-        updateUI();
-
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.task_added');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
-
-        // Dispatch task added event
-        window.dispatchEvent(new CustomEvent('taskAdded', {
-            detail: { task: newTask }
-        }));
-    }
-
-    // Delete a task
-    function deleteTask(taskId) {
-        // Find task index
-        const taskIndex = tasks.findIndex(task => task.id === taskId);
-        if (taskIndex === -1) return;
-
-        // Remove task
-        tasks.splice(taskIndex, 1);
-
-        // Save to storage
-        saveTasks();
-
-        // Update UI
-        updateUI();
-
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.task_deleted');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
-
-        // Dispatch task deleted event
-        window.dispatchEvent(new CustomEvent('taskDeleted', {
-            detail: { taskId }
-        }));
-    }
-
-    // Delete tasks by role
-    function deleteTasksByRole(roleId) {
-        tasks = tasks.filter(task => task.roleId !== roleId);
-        saveTasks();
-        updateUI();
-    }
-
-    // Toggle task completion
-    function toggleTaskCompletion(taskId) {
-        const task = tasks.find(task => task.id === taskId);
-        if (!task) return;
-
-        task.completed = !task.completed;
-        task.completedAt = task.completed ? new Date().toISOString() : null;
-
-        // Save to storage
-        saveTasks();
-
-        // Update UI
-        updateUI();
-
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.task_completed');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
-
-        // Dispatch task updated event
-        window.dispatchEvent(new CustomEvent('taskUpdated', {
-            detail: { task }
-        }));
-    }
-
-    // Switch view between roles and quadrants
-    function switchView(view) {
-        if (view !== 'roles' && view !== 'quadrants') return;
-        currentView = view;
-
-        // Update tab styles
-        if (elements.tabRoles && elements.tabQuadrants) {
-            elements.tabRoles.className = `flex-1 px-3 py-3 text-sm font-medium ${
-                view === 'roles' 
-                    ? 'text-gray-700 dark:text-gray-300 border-b-2 border-primary-500' 
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border-b-2 border-transparent'
-            } touch-manipulation focus-visible`;
-            elements.tabQuadrants.className = `flex-1 px-3 py-3 text-sm font-medium ${
-                view === 'quadrants' 
-                    ? 'text-gray-700 dark:text-gray-300 border-b-2 border-primary-500' 
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border-b-2 border-transparent'
-            } touch-manipulation focus-visible`;
-        }
-
-        // Show/hide views
-        if (elements.rolesView && elements.quadrantsView) {
-            elements.rolesView.classList.toggle('hidden', view !== 'roles');
-            elements.quadrantsView.classList.toggle('hidden', view !== 'quadrants');
-        }
-
-        // Update UI
-        updateUI();
-    }
-
-    // Start a new week
-    function startNewWeek() {
-        // Save current review
-        const review = elements.reviewInput?.value.trim();
-        if (review) {
-            localStorage.setItem('lastReview', review);
-            elements.lastReviewBox?.classList.remove('hidden');
-            elements.lastReviewText.textContent = review;
-        }
-
-        // Clear completed tasks
-        tasks = tasks.filter(task => !task.completed);
-
-        // Save to storage
-        saveTasks();
-
-        // Clear review input
-        if (elements.reviewInput) {
-            elements.reviewInput.value = '';
-        }
-
-        // Update UI
-        updateUI();
-
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.new_week_started');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
-
-        // Dispatch new week event
-        window.dispatchEvent(new CustomEvent('newWeekStarted'));
-    }
-
-    // Export metrics
-    function exportMetrics() {
-        try {
-            const metrics = {
-                totalTasks: tasks.length,
-                completedTasks: tasks.filter(task => task.completed).length,
-                tasksByQuadrant: {
-                    1: tasks.filter(task => task.quadrant === 1).length,
-                    2: tasks.filter(task => task.quadrant === 2).length,
-                    3: tasks.filter(task => task.quadrant === 3).length,
-                    4: tasks.filter(task => task.quadrant === 4).length
-                },
-                tasksByRole: tasks.reduce((acc, task) => {
-                    const role = Roles.getRoleById(task.roleId);
-                    if (role) {
-                        acc[role.name] = (acc[role.name] || 0) + 1;
-                    }
-                    return acc;
-                }, {}),
-                exportDate: new Date().toISOString()
-            };
-
-            const blob = new Blob([JSON.stringify(metrics, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `habitus-metrics-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            // Notify success
-            const successMsg = Translations.getTranslation('notifications.export_success');
-            window.dispatchEvent(new CustomEvent('showNotification', {
-                detail: { message: successMsg, type: 'success' }
-            }));
-        } catch (error) {
-            console.error('Error exporting metrics:', error);
-            const errorMsg = Translations.getTranslation('notifications.export_error');
-            window.dispatchEvent(new CustomEvent('showNotification', {
-                detail: { message: errorMsg, type: 'error' }
-            }));
-        }
-    }
-
-    // Export tasks
-    function exportTasks() {
-        try {
-            const exportData = tasks.map(task => ({
-                ...task,
-                role: Roles.getRoleById(task.roleId)?.name || 'Unknown'
-            }));
-
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `habitus-tasks-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            // Notify success
-            const successMsg = Translations.getTranslation('notifications.export_success');
-            window.dispatchEvent(new CustomEvent('showNotification', {
-                detail: { message: successMsg, type: 'success' }
-            }));
-        } catch (error) {
-            console.error('Error exporting tasks:', error);
-            const errorMsg = Translations.getTranslation('notifications.export_error');
-            window.dispatchEvent(new CustomEvent('showNotification', {
-                detail: { message: errorMsg, type: 'error' }
-            }));
-        }
+    // Save data to localStorage
+    function saveData() {
+        localStorage.setItem('habitus_tasks', JSON.stringify(tasks));
+        localStorage.setItem('habitus_metrics', JSON.stringify(metrics));
+        localStorage.setItem('habitus_tasksLog', JSON.stringify(tasksLog));
+        localStorage.setItem('habitus_lastReview', JSON.stringify(lastReviewText));
+        localStorage.setItem('habitus_lastReset', JSON.stringify(lastResetTime));
     }
 
     // Initialize charts
     function initCharts() {
-        // Quadrants chart
-        const quadrantsCtx = document.getElementById('chartQuadrants')?.getContext('2d');
-        if (quadrantsCtx) {
-            quadrantsChart = new Chart(quadrantsCtx, {
+        const ctxQ = document.getElementById('chartQuadrants')?.getContext('2d');
+        const ctxC = document.getElementById('chartCompletion')?.getContext('2d');
+        const ctxHC = document.getElementById('chartHistoricalCompletion')?.getContext('2d');
+        const ctxHQ = document.getElementById('chartHistoricalQuadrants')?.getContext('2d');
+        const ctxHR = document.getElementById('chartHistoricalRoles')?.getContext('2d');
+
+        if (ctxQ) {
+            chartQuadrants = new Chart(ctxQ, {
                 type: 'bar',
                 data: {
-                    labels: [
-                        Translations.getTranslation('quadrant_1'),
-                        Translations.getTranslation('quadrant_2'),
-                        Translations.getTranslation('quadrant_3'),
-                        Translations.getTranslation('quadrant_4')
-                    ],
+                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
                     datasets: [{
-                        label: Translations.getTranslation('tasks_by_quadrant'),
-                        data: [0, 0, 0, 0],
-                        backgroundColor: [
-                            'rgba(239, 68, 68, 0.5)',  // red-500
-                            'rgba(34, 197, 94, 0.5)',  // green-500
-                            'rgba(234, 179, 8, 0.5)',  // yellow-500
-                            'rgba(59, 130, 246, 0.5)'  // blue-500
-                        ],
-                        borderColor: [
-                            'rgb(239, 68, 68)',    // red-500
-                            'rgb(34, 197, 94)',    // green-500
-                            'rgb(234, 179, 8)',    // yellow-500
-                            'rgb(59, 130, 246)'    // blue-500
-                        ],
-                        borderWidth: 1
+                        label: 'Tareas',
+                        data: countTasksByQuadrant(),
+                        backgroundColor: ['#ef4444', '#22c55e', '#eab308', '#9ca3af']
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#374151' },
+                            grid: { display: false }
+                        },
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { precision: 0, color: '#374151' },
+                            grid: { color: '#e5e7eb' }
+                        }
+                    }
+                }
+            });
+        }
+
+        if (ctxC) {
+            chartCompletion = new Chart(ctxC, {
+                type: 'doughnut',
+                data: {
+                    labels: [Translations.getTranslation('metric_completed'), Translations.getTranslation('metric_pending')],
+                    datasets: [{
+                        data: countCompletedPending(),
+                        backgroundColor: ['#4ade80', '#f87171']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        },
+                        title: { display: false }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Initialize historical charts
+        const historicalData = prepareHistoricalData();
+
+        if (ctxHC) {
+            chartHistoricalCompletion = new Chart(ctxHC, {
+                type: 'line',
+                data: {
+                    labels: historicalData.labels,
+                    datasets: [{
+                        label: Translations.getTranslation('metric_percent'),
+                        data: historicalData.completionPercentages,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
                     scales: {
                         y: {
                             beginAtZero: true,
+                            max: 100,
                             ticks: {
-                                stepSize: 1
+                                callback: value => value + '%'
                             }
                         }
                     }
@@ -439,35 +213,75 @@ const Tasks = (() => {
             });
         }
 
-        // Completion chart
-        const completionCtx = document.getElementById('chartCompletion')?.getContext('2d');
-        if (completionCtx) {
-            completionChart = new Chart(completionCtx, {
-                type: 'doughnut',
+        if (ctxHQ) {
+            chartHistoricalQuadrants = new Chart(ctxHQ, {
+                type: 'bar',
                 data: {
-                    labels: [
-                        Translations.getTranslation('completed_tasks'),
-                        Translations.getTranslation('pending_tasks')
-                    ],
+                    labels: historicalData.labels,
+                    datasets: [
+                        {
+                            label: 'Q1',
+                            data: historicalData.q1Counts,
+                            backgroundColor: '#ef4444'
+                        },
+                        {
+                            label: 'Q2',
+                            data: historicalData.q2Counts,
+                            backgroundColor: '#22c55e'
+                        },
+                        {
+                            label: 'Q3',
+                            data: historicalData.q3Counts,
+                            backgroundColor: '#eab308'
+                        },
+                        {
+                            label: 'Q4',
+                            data: historicalData.q4Counts,
+                            backgroundColor: '#9ca3af'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+        }
+
+        if (ctxHR) {
+            chartHistoricalRoles = new Chart(ctxHR, {
+                type: 'line',
+                data: {
+                    labels: historicalData.labels,
                     datasets: [{
-                        data: [0, 0],
-                        backgroundColor: [
-                            'rgba(34, 197, 94, 0.5)',  // green-500
-                            'rgba(239, 68, 68, 0.5)'   // red-500
-                        ],
-                        borderColor: [
-                            'rgb(34, 197, 94)',    // green-500
-                            'rgb(239, 68, 68)'     // red-500
-                        ],
-                        borderWidth: 1
+                        label: Translations.getTranslation('metric_roles'),
+                        data: historicalData.activeRoles,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            position: 'bottom'
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
                         }
                     }
                 }
@@ -475,371 +289,364 @@ const Tasks = (() => {
         }
     }
 
-    // Update charts
-    function updateCharts() {
-        if (quadrantsChart) {
-            // Update quadrants chart data
-            const quadrantData = [1, 2, 3, 4].map(q => 
-                tasks.filter(task => task.quadrant === q).length
-            );
-            quadrantsChart.data.datasets[0].data = quadrantData;
-            quadrantsChart.data.labels = [
-                Translations.getTranslation('quadrant_1'),
-                Translations.getTranslation('quadrant_2'),
-                Translations.getTranslation('quadrant_3'),
-                Translations.getTranslation('quadrant_4')
-            ];
-            quadrantsChart.update();
-        }
-
-        if (completionChart) {
-            // Update completion chart data
-            const completed = tasks.filter(task => task.completed).length;
-            const pending = tasks.length - completed;
-            completionChart.data.datasets[0].data = [completed, pending];
-            completionChart.data.labels = [
-                Translations.getTranslation('completed_tasks'),
-                Translations.getTranslation('pending_tasks')
-            ];
-            completionChart.update();
-        }
-    }
-
     // Update UI
     function updateUI() {
-        // Update task views
-        updateTaskViews();
-
-        // Update metrics
+        renderTasks();
         updateMetrics();
-
-        // Update charts
         updateCharts();
-
-        // Apply translations
-        document.querySelectorAll('[data-i18n]').forEach(element => {
-            const key = element.getAttribute('data-i18n');
-            const translation = Translations.getTranslation(key);
-            if (translation) {
-                element.textContent = translation;
-            }
-        });
+        updateHistoricalCharts();
     }
 
-    // Update task views
-    function updateTaskViews() {
+    // Render tasks
+    function renderTasks() {
         if (!elements.rolesView || !elements.quadrantsView) return;
 
         // Clear views
         elements.rolesView.innerHTML = '';
         elements.quadrantsView.innerHTML = '';
 
-        if (currentView === 'roles') {
-            // Group tasks by role
-            const tasksByRole = tasks.reduce((acc, task) => {
-                const role = Roles.getRoleById(task.roleId);
-                if (role) {
-                    if (!acc[role.id]) {
-                        acc[role.id] = {
-                            role,
-                            tasks: []
-                        };
+        // Group tasks by role
+        const tasksByRole = {};
+        roles.forEach(role => {
+            tasksByRole[role] = tasks.filter(task => task.role === role);
+        });
+
+        // Render roles view
+        roles.forEach(role => {
+            const roleTasks = tasksByRole[role] || [];
+            const roleSection = document.createElement('div');
+            roleSection.className = 'mb-4';
+            roleSection.innerHTML = `
+                <h3 class="text-lg font-semibold mb-2">${role}</h3>
+                <div class="space-y-2" id="role-${role}">
+                    ${roleTasks.length === 0 ? 
+                        `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
+                        roleTasks.map(task => createTaskElement(task)).join('')
                     }
-                    acc[role.id].tasks.push(task);
-                }
-                return acc;
-            }, {});
+                </div>
+            `;
+            elements.rolesView.appendChild(roleSection);
+        });
 
-            // Create role sections
-            Object.values(tasksByRole).forEach(({ role, tasks: roleTasks }) => {
-                const roleSection = document.createElement('div');
-                roleSection.className = 'mb-6';
-                roleSection.innerHTML = `
-                    <h3 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">${role.name}</h3>
-                    <div class="space-y-2">
-                        ${roleTasks.map(task => createTaskElement(task)).join('')}
-                    </div>
-                `;
-                elements.rolesView.appendChild(roleSection);
-            });
-        } else {
-            // Group tasks by quadrant
-            const tasksByQuadrant = tasks.reduce((acc, task) => {
-                if (!acc[task.quadrant]) {
-                    acc[task.quadrant] = [];
-                }
-                acc[task.quadrant].push(task);
-                return acc;
-            }, {});
-
-            // Create quadrant sections
-            [1, 2, 3, 4].forEach(quadrant => {
-                const quadrantTasks = tasksByQuadrant[quadrant] || [];
-                const quadrantSection = document.createElement('div');
-                quadrantSection.className = 'mb-6';
-                quadrantSection.innerHTML = `
-                    <h3 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200" data-i18n="quadrant_${quadrant}">
-                        ${Translations.getTranslation(`quadrant_${quadrant}`)}
-                    </h3>
-                    <div class="space-y-2">
-                        ${quadrantTasks.map(task => createTaskElement(task)).join('')}
-                    </div>
-                `;
-                elements.quadrantsView.appendChild(quadrantSection);
-            });
+        // Render quadrants view
+        for (let quadrant = 1; quadrant <= 4; quadrant++) {
+            const quadrantTasks = tasks.filter(task => task.quadrant === quadrant.toString());
+            const quadrantSection = document.createElement('div');
+            quadrantSection.className = 'mb-4';
+            quadrantSection.innerHTML = `
+                <h3 class="text-lg font-semibold mb-2">${Translations.getTranslation(`quadrant_${quadrant}`)}</h3>
+                <div class="space-y-2" id="quadrant-${quadrant}">
+                    ${quadrantTasks.length === 0 ? 
+                        `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
+                        quadrantTasks.map(task => createTaskElement(task)).join('')
+                    }
+                </div>
+            `;
+            elements.quadrantsView.appendChild(quadrantSection);
         }
     }
 
     // Create task element
     function createTaskElement(task) {
-        const taskElement = document.createElement('div');
-        taskElement.className = 'task-item bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-2 relative group';
-        taskElement.draggable = true;
-        taskElement.dataset.taskId = task.id;
-        
-        // Add drag handle
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'drag-handle absolute left-2 top-1/2 -translate-y-1/2 cursor-move opacity-0 group-hover:opacity-100 transition-opacity';
-        dragHandle.innerHTML = '⋮⋮';
-        dragHandle.style.width = '20px';
-        dragHandle.style.height = '20px';
-        dragHandle.style.display = 'flex';
-        dragHandle.style.alignItems = 'center';
-        dragHandle.style.justifyContent = 'center';
-        
-        // Task content container
-        const contentContainer = document.createElement('div');
-        contentContainer.className = 'pl-8'; // Add padding for drag handle
-        
-        // Task description
-        const description = document.createElement('p');
-        description.className = `text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}`;
-        description.textContent = task.description;
-        
-        // Task metadata
-        const metadata = document.createElement('div');
-        metadata.className = 'flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400';
-        
-        // Role badge
-        const roleBadge = document.createElement('span');
-        roleBadge.className = 'role-badge px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-        roleBadge.textContent = Roles.getRoleName(task.roleId);
-        roleBadge.dataset.roleId = task.roleId;
-        
-        // Quadrant badge
-        const quadrantBadge = document.createElement('span');
-        quadrantBadge.className = 'quadrant-badge px-2 py-1 rounded-full ml-2';
-        quadrantBadge.textContent = `Q${task.quadrant}`;
-        quadrantBadge.dataset.quadrant = task.quadrant;
-        
-        // Set quadrant badge color
-        switch(task.quadrant) {
-            case 1:
-                quadrantBadge.classList.add('bg-red-100', 'dark:bg-red-900', 'text-red-800', 'dark:text-red-200');
-                break;
-            case 2:
-                quadrantBadge.classList.add('bg-yellow-100', 'dark:bg-yellow-900', 'text-yellow-800', 'dark:text-yellow-200');
-                break;
-            case 3:
-                quadrantBadge.classList.add('bg-green-100', 'dark:bg-green-900', 'text-green-800', 'dark:text-green-200');
-                break;
-            case 4:
-                quadrantBadge.classList.add('bg-blue-100', 'dark:bg-blue-900', 'text-blue-800', 'dark:text-blue-200');
-                break;
+        return `
+            <div class="flex items-center justify-between bg-white p-2 rounded shadow-sm" draggable="true" data-task-id="${task.id}">
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" 
+                           class="form-checkbox h-4 w-4 text-indigo-600" 
+                           ${task.completed ? 'checked' : ''} 
+                           onchange="Tasks.toggleTaskComplete('${task.id}')">
+                    <span class="text-sm ${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-500">${task.role}</span>
+                    <button onclick="Tasks.deleteTask('${task.id}')" class="text-red-500 hover:text-red-700">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Add a new task
+    function addTask() {
+        if (!elements.taskInput || !elements.roleSelect || !elements.quadrantSelect) return;
+
+        const description = elements.taskInput.value.trim();
+        const role = elements.roleSelect.value;
+        const quadrant = elements.quadrantSelect.value;
+
+        if (!description || !role || !quadrant) {
+            App.showNotification(Translations.getTranslation('errors.invalid_task'), 'error');
+            return;
         }
-        
-        // Completion checkbox
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'task-checkbox mr-2';
-        checkbox.checked = task.completed;
-        checkbox.addEventListener('change', () => toggleTaskCompletion(task.id));
-        
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-task text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity';
-        deleteBtn.innerHTML = '×';
-        deleteBtn.addEventListener('click', () => deleteTask(task.id));
-        
-        // Assemble task element
-        metadata.appendChild(roleBadge);
-        metadata.appendChild(quadrantBadge);
-        contentContainer.appendChild(description);
-        contentContainer.appendChild(metadata);
-        taskElement.appendChild(dragHandle);
-        taskElement.appendChild(checkbox);
-        taskElement.appendChild(contentContainer);
-        taskElement.appendChild(deleteBtn);
-        
-        // Add drag and drop event listeners
-        setupDragAndDrop(taskElement, task);
-        
-        return taskElement;
+
+        const task = {
+            id: Date.now().toString(),
+            description,
+            role,
+            quadrant,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+
+        tasks.push(task);
+        saveData();
+        updateUI();
+
+        // Clear inputs
+        elements.taskInput.value = '';
+        elements.roleSelect.value = '';
+        elements.quadrantSelect.value = '';
+
+        // Show success notification
+        App.showNotification(Translations.getTranslation('notifications.task_added'), 'success');
     }
 
-    // Setup drag and drop for a task element
-    function setupDragAndDrop(taskElement, task) {
-        // Drag start
-        taskElement.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', task.id);
-            taskElement.classList.add('opacity-50');
-            
-            // Add dragging class to body for global styles
-            document.body.classList.add('dragging');
+    // Toggle task completion
+    function toggleTaskComplete(taskId) {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        task.completed = !task.completed;
+        saveData();
+        updateUI();
+
+        // Show success notification
+        App.showNotification(
+            task.completed ? 
+                Translations.getTranslation('notifications.task_completed') :
+                Translations.getTranslation('notifications.task_uncompleted'),
+            'success'
+        );
+    }
+
+    // Delete a task
+    function deleteTask(taskId) {
+        const taskIndex = tasks.findIndex(t => t.id === taskId);
+        if (taskIndex === -1) return;
+
+        tasks.splice(taskIndex, 1);
+        saveData();
+        updateUI();
+
+        // Show success notification
+        App.showNotification(Translations.getTranslation('notifications.task_deleted'), 'success');
+    }
+
+    // Save review
+    function saveReview() {
+        if (!elements.reviewInput) return;
+
+        lastReviewText = elements.reviewInput.value.trim();
+        saveData();
+
+        // Show success notification
+        App.showNotification(Translations.getTranslation('notifications.review_saved'), 'success');
+    }
+
+    // Start new week
+    function startNewWeek() {
+        // Save current week's data
+        const weekMetrics = {
+            timestamp: Date.now(),
+            totalTasks: tasks.length,
+            completedTasks: tasks.filter(t => t.completed).length,
+            activeRoles: Roles.getRoles().length,
+            quadrants: countTasksByQuadrant()
+        };
+        metrics.push(weekMetrics);
+
+        // Log completed tasks
+        const completedTasks = tasks.filter(t => t.completed);
+        tasksLog.push({
+            timestamp: Date.now(),
+            tasks: completedTasks
         });
-        
-        // Drag end
-        taskElement.addEventListener('dragend', () => {
-            taskElement.classList.remove('opacity-50');
-            document.body.classList.remove('dragging');
-        });
-        
-        // Make role and quadrant badges drop targets
-        const roleBadge = taskElement.querySelector('.role-badge');
-        const quadrantBadge = taskElement.querySelector('.quadrant-badge');
-        
-        // Role badge drop handling
-        roleBadge.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            roleBadge.classList.add('bg-blue-200', 'dark:bg-blue-800');
-        });
-        
-        roleBadge.addEventListener('dragleave', () => {
-            roleBadge.classList.remove('bg-blue-200', 'dark:bg-blue-800');
-        });
-        
-        roleBadge.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            roleBadge.classList.remove('bg-blue-200', 'dark:bg-blue-800');
-            
-            const draggedTaskId = e.dataTransfer.getData('text/plain');
-            const newRoleId = roleBadge.dataset.roleId;
-            
-            if (draggedTaskId !== task.id) {
-                updateTaskRole(draggedTaskId, newRoleId);
+
+        // Remove completed tasks
+        tasks = tasks.filter(t => !t.completed);
+
+        // Update last reset time
+        lastResetTime = Date.now();
+
+        // Save data
+        saveData();
+        updateUI();
+
+        // Show success notification
+        App.showNotification(Translations.getTranslation('notifications.new_week_started'), 'success');
+    }
+
+    // Count tasks by quadrant
+    function countTasksByQuadrant() {
+        const counts = [0, 0, 0, 0];
+        tasks.forEach(task => {
+            const quadrant = parseInt(task.quadrant) - 1;
+            if (quadrant >= 0 && quadrant < 4) {
+                counts[quadrant]++;
             }
         });
-        
-        // Quadrant badge drop handling
-        quadrantBadge.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            quadrantBadge.classList.add('ring-2', 'ring-offset-2', 'ring-current');
-        });
-        
-        quadrantBadge.addEventListener('dragleave', () => {
-            quadrantBadge.classList.remove('ring-2', 'ring-offset-2', 'ring-current');
-        });
-        
-        quadrantBadge.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            quadrantBadge.classList.remove('ring-2', 'ring-offset-2', 'ring-current');
-            
-            const draggedTaskId = e.dataTransfer.getData('text/plain');
-            const newQuadrant = parseInt(quadrantBadge.dataset.quadrant);
-            
-            if (draggedTaskId !== task.id) {
-                updateTaskQuadrant(draggedTaskId, newQuadrant);
-            }
-        });
+        return counts;
     }
 
-    // Update task role
-    function updateTaskRole(taskId, newRoleId) {
-        const taskIndex = tasks.findIndex(task => task.id === taskId);
-        if (taskIndex === -1) return;
-        
-        tasks[taskIndex].roleId = newRoleId;
-        saveTasks();
-        updateUI();
-        
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.task_updated');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
+    // Count completed and pending tasks
+    function countCompletedPending() {
+        const completed = tasks.filter(t => t.completed).length;
+        const pending = tasks.length - completed;
+        return [completed, pending];
     }
 
-    // Update task quadrant
-    function updateTaskQuadrant(taskId, newQuadrant) {
-        const taskIndex = tasks.findIndex(task => task.id === taskId);
-        if (taskIndex === -1) return;
-        
-        tasks[taskIndex].quadrant = newQuadrant;
-        saveTasks();
-        updateUI();
-        
-        // Notify success
-        const successMsg = Translations.getTranslation('notifications.task_updated');
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: { message: successMsg, type: 'success' }
-        }));
+    // Prepare historical data
+    function prepareHistoricalData() {
+        const labels = metrics.map(m => new Date(m.timestamp).toLocaleDateString());
+        const completionPercentages = metrics.map(m => 
+            m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0
+        );
+        const q1Counts = metrics.map(m => m.quadrants[0]);
+        const q2Counts = metrics.map(m => m.quadrants[1]);
+        const q3Counts = metrics.map(m => m.quadrants[2]);
+        const q4Counts = metrics.map(m => m.quadrants[3]);
+        const activeRoles = metrics.map(m => m.activeRoles);
+
+        return {
+            labels,
+            completionPercentages,
+            q1Counts,
+            q2Counts,
+            q3Counts,
+            q4Counts,
+            activeRoles
+        };
     }
 
     // Update metrics
     function updateMetrics() {
-        // Update total tasks
-        if (elements.totalTasks) {
-            elements.totalTasks.textContent = tasks.length;
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.completed).length;
+        const completionPercentage = totalTasks > 0 ? 
+            Math.round((completedTasks / totalTasks) * 100) : 0;
+        const activeRoles = Roles.getRoles().length;
+        const quadrants = countTasksByQuadrant();
+
+        // Update metrics display
+        const totalTasksEl = document.getElementById('totalTasks');
+        const completionPercentageEl = document.getElementById('completionPercentage');
+        const activeRolesEl = document.getElementById('activeRoles');
+        const q1CountEl = document.getElementById('q1Count');
+        const q2CountEl = document.getElementById('q2Count');
+        const q3CountEl = document.getElementById('q3Count');
+        const q4CountEl = document.getElementById('q4Count');
+
+        if (totalTasksEl) totalTasksEl.textContent = totalTasks;
+        if (completionPercentageEl) completionPercentageEl.textContent = completionPercentage + '%';
+        if (activeRolesEl) activeRolesEl.textContent = activeRoles;
+        if (q1CountEl) q1CountEl.textContent = quadrants[0];
+        if (q2CountEl) q2CountEl.textContent = quadrants[1];
+        if (q3CountEl) q3CountEl.textContent = quadrants[2];
+        if (q4CountEl) q4CountEl.textContent = quadrants[3];
+    }
+
+    // Update charts
+    function updateCharts() {
+        if (chartQuadrants) {
+            chartQuadrants.data.datasets[0].data = countTasksByQuadrant();
+            chartQuadrants.update();
         }
 
-        // Update completion percentage
-        if (elements.completionPercentage) {
-            const completed = tasks.filter(task => task.completed).length;
-            const percentage = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
-            elements.completionPercentage.textContent = `${percentage}%`;
+        if (chartCompletion) {
+            chartCompletion.data.datasets[0].data = countCompletedPending();
+            chartCompletion.update();
+        }
+    }
+
+    // Update historical charts
+    function updateHistoricalCharts() {
+        const historicalData = prepareHistoricalData();
+
+        if (chartHistoricalCompletion) {
+            chartHistoricalCompletion.data.labels = historicalData.labels;
+            chartHistoricalCompletion.data.datasets[0].data = historicalData.completionPercentages;
+            chartHistoricalCompletion.update();
         }
 
-        // Update quadrant counts
-        if (elements.q1Count) elements.q1Count.textContent = tasks.filter(task => task.quadrant === 1).length;
-        if (elements.q2Count) elements.q2Count.textContent = tasks.filter(task => task.quadrant === 2).length;
-        if (elements.q3Count) elements.q3Count.textContent = tasks.filter(task => task.quadrant === 3).length;
-        if (elements.q4Count) elements.q4Count.textContent = tasks.filter(task => task.quadrant === 4).length;
+        if (chartHistoricalQuadrants) {
+            chartHistoricalQuadrants.data.labels = historicalData.labels;
+            chartHistoricalQuadrants.data.datasets[0].data = historicalData.q1Counts;
+            chartHistoricalQuadrants.data.datasets[1].data = historicalData.q2Counts;
+            chartHistoricalQuadrants.data.datasets[2].data = historicalData.q3Counts;
+            chartHistoricalQuadrants.data.datasets[3].data = historicalData.q4Counts;
+            chartHistoricalQuadrants.update();
+        }
+
+        if (chartHistoricalRoles) {
+            chartHistoricalRoles.data.labels = historicalData.labels;
+            chartHistoricalRoles.data.datasets[0].data = historicalData.activeRoles;
+            chartHistoricalRoles.update();
+        }
     }
 
-    // Get all tasks
-    function getAllTasks() {
-        return [...tasks];
+    // Export metrics to CSV
+    function exportMetrics() {
+        const headers = ['Week', 'Total Tasks', 'Completed Tasks', 'Completion %', 'Active Roles', 'Q1', 'Q2', 'Q3', 'Q4'];
+        const rows = metrics.map(m => [
+            new Date(m.timestamp).toLocaleDateString(),
+            m.totalTasks,
+            m.completedTasks,
+            m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0,
+            m.activeRoles,
+            m.quadrants[0],
+            m.quadrants[1],
+            m.quadrants[2],
+            m.quadrants[3]
+        ]);
+
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        downloadCSV(csv, 'habitus-metrics.csv');
     }
 
-    // Get tasks by role
-    function getTasksByRole(roleId) {
-        return tasks.filter(task => task.roleId === roleId);
+    // Export tasks to CSV
+    function exportTasks() {
+        const headers = ['Week', 'Task', 'Role', 'Quadrant', 'Status', 'Created At'];
+        const rows = tasksLog.flatMap(log => 
+            log.tasks.map(task => [
+                new Date(log.timestamp).toLocaleDateString(),
+                task.description,
+                task.role,
+                task.quadrant,
+                task.completed ? 'Completed' : 'Pending',
+                new Date(task.createdAt).toLocaleString()
+            ])
+        );
+
+        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+        downloadCSV(csv, 'habitus-tasks.csv');
     }
 
-    // Get tasks by quadrant
-    function getTasksByQuadrant(quadrant) {
-        return tasks.filter(task => task.quadrant === quadrant);
-    }
-
-    // Get completed tasks
-    function getCompletedTasks() {
-        return tasks.filter(task => task.completed);
-    }
-
-    // Get pending tasks
-    function getPendingTasks() {
-        return tasks.filter(task => !task.completed);
+    // Download CSV file
+    function downloadCSV(csv, filename) {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     // Public API
     return {
         init,
         addTask,
+        toggleTaskComplete,
         deleteTask,
-        toggleTaskCompletion,
-        switchView,
+        saveReview,
         startNewWeek,
         exportMetrics,
-        exportTasks,
-        getAllTasks,
-        getTasksByRole,
-        getTasksByQuadrant,
-        getCompletedTasks,
-        getPendingTasks
+        exportTasks
     };
 })();
 

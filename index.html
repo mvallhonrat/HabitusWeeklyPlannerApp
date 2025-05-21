@@ -30,7 +30,7 @@
 </div>
 <div class="mb-6" id="pasaje-inspirador">
 <div class="text-gray-700 text-center mt-2" id="verso-contenedor">
-<!-- El versículo aleatorio se cargará aquí dinámicamente -->
+<!-- The inspirational quote will be loaded here dynamically -->
 </div>
 </div></div><script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
@@ -94,7 +94,15 @@
 <ul class="list-disc list-inside text-sm space-y-2">
 <li data-i18n="inst_1">🎭 <strong>Define tus Roles:</strong> Identifica los roles importantes en tu vida (por ejemplo: Padre, Profesional, Amigo). Estos serán las categorías bajo las cuales organizarás tus tareas semanales.</li>
 <li data-i18n="inst_2">📝 <strong>Agrega tus Tareas:</strong> Para cada rol, añade las tareas que deseas realizar esta semana. Escribe una breve descripción y asigna el cuadrante correspondiente según su urgencia e importancia.</li>
-<li data-i18n="inst_3">🔢 Prioriza con los Cuadrantes: Utiliza la Matriz de Prioridades (I-IV) para clasificar cada tarea:</li><div class="ml-6 mt-1 text-sm" data-i18n="inst_3_sub"></div>
+<li data-i18n="inst_3">🔢 Prioriza con los Cuadrantes: Utiliza la Matriz de Prioridades (I-IV) para clasificar cada tarea:</li>
+<div class="ml-6 mt-1 text-sm" data-i18n="inst_3_sub">
+    <ul class="list-none ml-4 mt-1">
+        <li data-i18n="inst_4">I – Urgente e Importante (hacer de inmediato).</li>
+        <li data-i18n="inst_5">II – No Urgente e Importante (planificar tiempo para hacer).</li>
+        <li data-i18n="inst_6">III – Urgente y No Importante (intentar delegar o minimizar).</li>
+        <li data-i18n="inst_7">IV – No Urgente y No Importante (evitar en lo posible).</li>
+    </ul>
+</div>
 <li data-i18n="inst_8">✅ <strong>Marca las Completadas:</strong> A medida que termines cada tarea, márcala como realizada con la casilla de verificación.</li>
 <li data-i18n="inst_9">🔄 <strong>Vista de Roles/Cuadrantes:</strong> Alterna entre la vista agrupada por roles o por cuadrantes usando las pestañas para obtener diferentes perspectivas de tus tareas.</li>
 <li data-i18n="inst_10">📊 <strong>Revisa tus Métricas:</strong> Al finalizar la semana, revisa el resumen de tareas completadas y pendientes, y reflexiona sobre tu semana en Revisión Semanal.</li>
@@ -251,479 +259,34 @@
 </div>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
-<script src="app.js" defer></script>
+<script src="translations.js"></script>
+<script src="app.js"></script>
+<script src="roles.js"></script>
+<script src="tasks.js"></script>
 <script src="translations.json" type="application/json" id="translations-data"></script>
 <script src="passages.json" type="application/json" id="passages-data"></script>
 
-<!-- Remove the inline translations and passages scripts -->
-<script data-i18n="no_tasks">
-  // Variables globales
-  let roles = [];
-  let tasks = [];
-  let metrics = [];    // histórico semanal de métricas
-  let tasksLog = [];   // histórico de tareas
-  let lastReviewText = "";  // última reflexión guardada
-  let lastResetTime = null; // timestamp de último "Nueva Semana"
-  let chartQuadrants = null;
-  let chartCompletion = null;
-  let chartHistoricalCompletion = null;
-  let chartHistoricalQuadrants = null;
-  let chartHistoricalRoles = null;
-
-  // === Cargar datos de localStorage (si existen) al iniciar ===
-  (function loadData() {
-    const storedRoles = localStorage.getItem("habitus_roles");
-    const storedTasks = localStorage.getItem("habitus_tasks");
-    const storedMetrics = localStorage.getItem("habitus_metrics");
-    const storedTasksLog = localStorage.getItem("habitus_tasksLog");
-    const storedLastReview = localStorage.getItem("habitus_lastReview");
-    const storedLastReset = localStorage.getItem("habitus_lastReset");
-
-    if(storedRoles) roles = JSON.parse(storedRoles);
-    if(storedTasks) tasks = JSON.parse(storedTasks);
-    if(storedMetrics) metrics = JSON.parse(storedMetrics);
-    if(storedTasksLog) tasksLog = JSON.parse(storedTasksLog);
-    if(storedLastReview) lastReviewText = JSON.parse(storedLastReview);
-    if(storedLastReset) lastResetTime = parseInt(storedLastReset);
-
-    // Poblar dropdown de roles
-    updateRoleOptions();
-    
-    // Mostrar última revisión si existe
-    if(lastReviewText && lastReviewText.trim() !== "") {
-      const lastReviewBox = document.getElementById("lastReviewBox");
-      const lastReviewSpan = document.getElementById("lastReviewText");
-      lastReviewSpan.textContent = lastReviewText;
-      lastReviewBox.style.display = "block";
-    }
-  })();
-
-  // === Función para actualizar las opciones del select de roles ===
-  function updateRoleOptions() {
-    const roleSelect = document.getElementById("roleSelect");
-    // Limpiar opciones actuales (excepto placeholder)
-    roleSelect.innerHTML = '<option value="" disabled selected>Rol</option>';
-    roles.forEach(role => {
-      const opt = document.createElement("option");
-      opt.value = role;
-      opt.textContent = role;
-      roleSelect.appendChild(opt);
-    });
-    
-    renderRoleList();
-  }
-
-  // === Inicializar gráficos Chart.js ===
-  function initCharts() {
-    const ctxQ = document.getElementById('chartQuadrants').getContext('2d');
-    const ctxC = document.getElementById('chartCompletion').getContext('2d');
-    const ctxHC = document.getElementById('chartHistoricalCompletion').getContext('2d');
-    const ctxHQ = document.getElementById('chartHistoricalQuadrants').getContext('2d');
-    const ctxHR = document.getElementById('chartHistoricalRoles').getContext('2d');
-
-    // Datos iniciales para gráficos
-    const quadCounts = countTasksByQuadrant();
-    const compCounts = countCompletedPending();
-    const historicalData = prepareHistoricalData();
-
-    // Configuración del gráfico de barras (Cuadrantes)
-    chartQuadrants = new Chart(ctxQ, {
-      type: 'bar',
-      data: {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        datasets: [{
-          label: 'Tareas',
-          data: quadCounts,
-          backgroundColor: ['#ef4444','#22c55e','#eab308','#9ca3af'] // rojo, verde, amarillo, gris
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          title: { display: false }
-        },
-        scales: {
-          x: { 
-            ticks: { color: '#374151' },
-            grid: { display: false }
-          },
-          y: { 
-            beginAtZero: true, 
-            ticks: { precision: 0, color: '#374151' },
-            grid: { color: '#e5e7eb' }
-          }
-        }
-      }
-    });
-
-    // Configuración del gráfico doughnut (Completadas vs Pendientes)
-    chartCompletion = new Chart(ctxC, {
-      type: 'doughnut',
-      data: {
-        labels: ['Completadas','Pendientes'],
-        datasets: [{
-          data: compCounts,
-          backgroundColor: ['#4ade80', '#f87171'] // verde-400, rojo-400
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { 
-            position: 'bottom',
-            labels: {
-              boxWidth: 12,
-              padding: 15
-            }
-          },
-          title: { display: false }
-        },
-        cutout: '70%'
-      }
-    });
-
-    // Configuración del gráfico de línea (Porcentaje de completado histórico)
-    chartHistoricalCompletion = new Chart(ctxHC, {
-      type: 'line',
-      data: {
-        labels: historicalData.labels,
-        datasets: [{
-          label: 'Porcentaje Completado',
-          data: historicalData.completionPercentages,
-          borderColor: '#4f46e5',
-          backgroundColor: 'rgba(79, 70, 229, 0.1)',
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          title: { display: false }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            max: 100,
-            ticks: {
-              callback: value => value + '%'
-            }
-          }
-        }
-      }
-    });
-
-    // Configuración del gráfico de barras (Tareas por cuadrante histórico)
-    chartHistoricalQuadrants = new Chart(ctxHQ, {
-      type: 'bar',
-      data: {
-        labels: historicalData.labels,
-        datasets: [
-          {
-            label: 'Q1',
-            data: historicalData.q1Counts,
-            backgroundColor: '#ef4444'
-          },
-          {
-            label: 'Q2',
-            data: historicalData.q2Counts,
-            backgroundColor: '#22c55e'
-          },
-          {
-            label: 'Q3',
-            data: historicalData.q3Counts,
-            backgroundColor: '#eab308'
-          },
-          {
-            label: 'Q4',
-            data: historicalData.q4Counts,
-            backgroundColor: '#9ca3af'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' }
-        },
-        scales: {
-          x: { stacked: true },
-          y: { stacked: true }
-        }
-      }
-    });
-
-    // Configuración del gráfico de línea (Roles activos histórico)
-    chartHistoricalRoles = new Chart(ctxHR, {
-      type: 'line',
-      data: {
-        labels: historicalData.labels,
-        datasets: [{
-          label: 'Roles Activos',
-          data: historicalData.activeRoles,
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.1)',
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          title: { display: false }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0
-            }
-          }
-        }
-      }
-    });
-
-    // Actualizar métricas actuales
-    updateCurrentMetrics();
-  }
-
-  // === Función para renderizar la lista de roles ===
-  function renderRoleList() {
-    const rolesList = document.getElementById("rolesList");
-    rolesList.innerHTML = ""; // Limpiar lista actual
-    
-    if(roles.length === 0) {
-      rolesList.innerHTML = '<p class="text-sm text-gray-500">* No hay roles definidos *</p>';
-      return;
-    }
-    
-    roles.forEach((role, index) => {
-      const roleItem = document.createElement("div");
-      roleItem.className = "flex items-center justify-between bg-white p-2 rounded shadow-sm";
-      roleItem.innerHTML = `
-        <span class="text-sm">${role}</span>
-        <button onclick="deleteRole(${index})" class="text-red-500 hover:text-red-700">
-          🗑️
-        </button>
-      `;
-      rolesList.appendChild(roleItem);
-    });
-  }
-
-  // === Función para renderizar la lista de cuadrantes ===
-  function renderQuadrantList() {
-    // ... existing renderQuadrantList code ...
-  }
-
-  // === Función para añadir un nuevo rol ===
-  function addRole() {
-    // ... existing addRole code ...
-  }
-
-  // === Función para añadir una nueva tarea ===
-  function addTask() {
-    // ... existing addTask code ...
-  }
-
-  // === Función para marcar una tarea como completada ===
-  function toggleTaskComplete(taskId) {
-    // ... existing toggleTaskComplete code ...
-  }
-
-  // === Función para eliminar una tarea ===
-  function deleteTask(taskId) {
-    // ... existing deleteTask code ...
-  }
-
-  // === Función para guardar la revisión semanal ===
-  function saveReview() {
-    // ... existing saveReview code ...
-  }
-
-  // === Función para iniciar una nueva semana ===
-  function startNewWeek() {
-    // ... existing startNewWeek code ...
-  }
-
-  // === Función para exportar métricas ===
-  function exportMetrics() {
-    // ... existing exportMetrics code ...
-  }
-
-  // === Función para exportar tareas ===
-  function exportTasks() {
-    // ... existing exportTasks code ...
-  }
-
-  // === Función para contar tareas por cuadrante ===
-  function countTasksByQuadrant() {
-    // ... existing countTasksByQuadrant code ...
-  }
-
-  // === Función para contar tareas completadas y pendientes ===
-  function countCompletedPending() {
-    // ... existing countCompletedPending code ...
-  }
-
-  // === Función para preparar datos históricos ===
-  function prepareHistoricalData() {
-    // ... existing prepareHistoricalData code ...
-  }
-
-  // === Función para actualizar métricas ===
-  function updateMetrics() {
-    // ... existing updateMetrics code ...
-  }
-
-  // === Función para actualizar gráficos ===
-  function updateCharts() {
-    // ... existing updateCharts code ...
-  }
-
-  // === Función para actualizar gráficos históricos ===
-  function updateHistoricalCharts() {
-    // ... existing updateHistoricalCharts code ...
-  }
-
-  // === Función para actualizar resumen de métricas ===
-  function updateMetricsSummary() {
-    // ... existing updateMetricsSummary code ...
-  }
-
-  // === Función para actualizar el pasaje inspirador ===
-  function updateInspirationalQuote() {
-    // ... existing updateInspirationalQuote code ...
-  }
-
-  // === Función para aplicar traducciones ===
-  function applyTranslations(lang) {
-    // Load translations from external JSON file
-    fetch('translations.json')
-      .then(response => response.json())
-      .then(data => {
-        const t = data[lang] || data["es"]; // Fallback to Spanish if language not found
-
-        // Update text content for elements with data-i18n attribute
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-          const key = el.getAttribute('data-i18n');
-          if (t[key]) {
-            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-              el.value = t[key];
-            } else {
-              // For instruction items, preserve the HTML structure
-              if (key.startsWith('inst_')) {
-                el.innerHTML = t[key];
-              } else {
-                el.textContent = t[key];
-              }
-            }
-          }
-        });
-
-        // Update placeholders
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-          const key = el.getAttribute('data-i18n-placeholder');
-          if (t[key]) el.placeholder = t[key];
-        });
-
-        // Update chart titles and labels
-        if (typeof chartQuadrants !== "undefined" && chartQuadrants) {
-          chartQuadrants.options.plugins.title = {
-            display: true,
-            text: t.chart_title_quadrants
-          };
-          chartQuadrants.update();
-        }
-
-        if (typeof chartCompletion !== "undefined" && chartCompletion) {
-          chartCompletion.data.labels = [t.metric_completed, t.metric_pending];
-          chartCompletion.update();
-        }
-
-        if (typeof chartHistoricalCompletion !== "undefined" && chartHistoricalCompletion) {
-          chartHistoricalCompletion.options.plugins.title = {
-            display: true,
-            text: t.chart_completion_title
-          };
-          chartHistoricalCompletion.update();
-        }
-
-        if (typeof chartHistoricalQuadrants !== "undefined" && chartHistoricalQuadrants) {
-          chartHistoricalQuadrants.options.plugins.title = {
-            display: true,
-            text: t.chart_quadrants_title
-          };
-          chartHistoricalQuadrants.update();
-        }
-
-        if (typeof chartHistoricalRoles !== "undefined" && chartHistoricalRoles) {
-          chartHistoricalRoles.options.plugins.title = {
-            display: true,
-            text: t.chart_roles_title
-          };
-          chartHistoricalRoles.update();
-        }
-      });
-  }
-
-  // === Función para establecer el idioma ===
-  function setLanguage(lang) {
-    localStorage.setItem("habitus_lang", lang);
-    applyTranslations(lang);
-    
-    // Update inspirational quote
-    fetch('passages.json')
-      .then(response => response.json())
-      .then(data => {
-        const elegido = data[lang][Math.floor(Math.random() * data[lang].length)];
-        document.getElementById("inspirationalQuote").textContent = elegido.contenido;
-        document.getElementById("inspirationalPassage").textContent = elegido.pasaje;
-      });
-  }
-
-  // === Inicialización ===
-  document.addEventListener('DOMContentLoaded', function() {
-    // Cargar datos guardados
-    loadData();
-    
-    // Inicializar gráficos
-    initCharts();
-    
-    // Actualizar métricas y gráficos
-    updateMetrics();
-    updateCharts();
-    updateHistoricalCharts();
-    updateMetricsSummary();
-    
-    // Actualizar pasaje inspirador
-    updateInspirationalQuote();
-    
-    // Cargar idioma guardado o usar español por defecto
-    const savedLang = localStorage.getItem("habitus_lang") || "es";
-    setLanguage(savedLang);
-    
-    // Registrar service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(registration => {
-          console.log('ServiceWorker registration successful');
-        })
-        .catch(err => {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-    }
-  });
-</script>
-
-<!-- Remove the inline passages script -->
 <script>
-  // ... existing code ...
+// Remove the inline translations and passages scripts
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize modules
+    App.init();
+    Translations.init();
+    Roles.init();
+    Tasks.init();
+    
+    // Load translations and inspirational quote
+    Translations.loadTranslations();
+    
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+    }
+});
 </script>
