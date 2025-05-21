@@ -235,10 +235,24 @@ const Translations = (() => {
                 return;
             }
 
+            // Show loading state
+            elements.quoteContainer.innerHTML = `
+                <div class="bg-white rounded-lg shadow-sm p-4">
+                    <p class="text-lg font-medium text-gray-800">${getTranslation('loading_quote')}</p>
+                    <p class="text-sm text-gray-600 mt-2 italic">${getTranslation('loading_quote_sub')}</p>
+                </div>
+            `;
+
             // Get passages from the global variable
             const passages = window.PASAJES_BILINGUES;
-            if (!passages || !passages[currentLanguage] || !passages[currentLanguage].length) {
-                throw new Error('No passages available for current language');
+            if (!passages) {
+                throw new Error('PASAJES_BILINGUES not found. Make sure pasajes_bilingues.js is loaded.');
+            }
+            if (!passages[currentLanguage]) {
+                throw new Error(`No passages available for language: ${currentLanguage}`);
+            }
+            if (!passages[currentLanguage].length) {
+                throw new Error(`Empty passages array for language: ${currentLanguage}`);
             }
 
             // Get random passage
@@ -253,9 +267,9 @@ const Translations = (() => {
                     <p class="text-sm text-gray-600 mt-2 italic">${passage.pasaje}</p>
                 </div>
             `;
-            console.log('Inspirational quote updated successfully');
         } catch (error) {
             console.error('Error updating inspirational quote:', error);
+            // Show error state
             if (elements.quoteContainer) {
                 elements.quoteContainer.innerHTML = `
                     <div class="bg-white rounded-lg shadow-sm p-4">
