@@ -4,14 +4,16 @@ const ASSETS_TO_CACHE = [
   '/index.html',
   '/styles.css',
   '/app.js',
-  '/manifest.json',
+  '/tasks.js',
+  '/roles.js',
+  '/translations.js',
   '/translations.json',
   '/passages.json',
+  '/manifest.json',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/icons/screenshot1.png',
+  '/icons/icon-514x5154.png',
   'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/chart.js'
+  'https://cdn.jsdelivr.net/npm/chart.js@3'
 ];
 
 // Install event - cache assets
@@ -19,7 +21,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Caching app assets');
         return cache.addAll(ASSETS_TO_CACHE);
       })
       .then(() => self.skipWaiting())
@@ -44,38 +46,45 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - serve from cache, fall back to network
 self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests
+  if (!event.request.url.startsWith(self.location.origin) && 
+      !event.request.url.startsWith('https://cdn.tailwindcss.com') &&
+      !event.request.url.startsWith('https://cdn.jsdelivr.net')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
         if (response) {
           return response;
         }
-
-        // Clone the request because it's a one-time use stream
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then(
-          (response) => {
-            // Check if we received a valid response
+        return fetch(event.request)
+          .then((response) => {
+            // Don't cache if not a success response
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // Clone the response because it's a one-time use stream
+            // Clone the response
             const responseToCache = response.clone();
 
+            // Cache the fetched response
             caches.open(CACHE_NAME)
               .then((cache) => {
-                // Don't cache external resources
-                if (!event.request.url.startsWith('http')) {
-                  cache.put(event.request, responseToCache);
-                }
+                cache.put(event.request, responseToCache);
               });
 
             return response;
-          }
-        );
+          })
+          .catch((error) => {
+            console.error('Fetch failed:', error);
+            // Return a fallback response for HTML requests
+            if (event.request.headers.get('accept').includes('text/html')) {
+              return caches.match('/index.html');
+            }
+            throw error;
+          });
       })
   );
 }); 

@@ -350,34 +350,45 @@ async function initApp() {
     try {
         console.log('Starting application initialization...');
         
-        // Initialize App module first
-        await App.init();
-        
-        // Initialize language switch
-        const langSwitch = document.getElementById('langSwitch');
-        if (langSwitch) {
-            langSwitch.addEventListener('click', async () => {
-                const currentLang = Translations.getCurrentLanguage();
-                const newLang = currentLang === 'es' ? 'en' : 'es';
-                await Translations.setLanguage(newLang);
-            });
-        }
-        
-        // Load passages
+        // Load passages first
         try {
+            const response = await fetch('passages.json');
+            if (!response.ok) throw new Error('Failed to load passages');
+            const passages = await response.json();
             const passagesData = document.getElementById('passages-data');
-            if (!passagesData || !passagesData.textContent) {
-                throw new Error('Passages data not found');
+            if (passagesData) {
+                passagesData.textContent = JSON.stringify(passages);
+                console.log('Passages loaded successfully');
             }
-            console.log('Passages loaded successfully');
         } catch (error) {
             console.error('Error loading passages:', error);
             App.showNotification('Error loading inspirational quotes', 'error');
         }
         
+        // Initialize App module
+        await App.init();
+        
+        // Initialize language switch
+        const langSwitch = document.getElementById('langSwitch');
+        if (langSwitch) {
+            // Set initial state based on saved language
+            const savedLang = localStorage.getItem('habitus_lang') || 'es';
+            langSwitch.classList.toggle('active', savedLang === 'en');
+            
+            langSwitch.addEventListener('click', async () => {
+                const currentLang = Translations.getCurrentLanguage();
+                const newLang = currentLang === 'es' ? 'en' : 'es';
+                await Translations.setLanguage(newLang);
+                langSwitch.classList.toggle('active');
+            });
+        }
+        
         // Set up export buttons
         document.getElementById('exportMetricsBtn')?.addEventListener('click', Tasks.exportMetrics);
         document.getElementById('exportTasksBtn')?.addEventListener('click', Tasks.exportTasks);
+        
+        // Set up migration button
+        document.getElementById('migrateDataBtn')?.addEventListener('click', migrateData);
         
         console.log('Application initialized successfully');
     } catch (error) {
@@ -386,13 +397,64 @@ async function initApp() {
     }
 }
 
+// Data migration function
+async function migrateData() {
+    try {
+        // Get old data
+        const oldTasks = JSON.parse(localStorage.getItem('habitus_tasks') || '[]');
+        const oldMetrics = JSON.parse(localStorage.getItem('habitus_metrics') || '[]');
+        const oldTasksLog = JSON.parse(localStorage.getItem('habitus_tasksLog') || '[]');
+        const oldLastReview = localStorage.getItem('habitus_lastReview') || '';
+        const oldLastReset = localStorage.getItem('habitus_lastReset');
+        const oldRoles = JSON.parse(localStorage.getItem('habitus_roles') || '[]');
+        
+        // Backup old data
+        localStorage.setItem('habitus_tasks_backup', JSON.stringify(oldTasks));
+        localStorage.setItem('habitus_metrics_backup', JSON.stringify(oldMetrics));
+        localStorage.setItem('habitus_tasksLog_backup', JSON.stringify(oldTasksLog));
+        localStorage.setItem('habitus_lastReview_backup', oldLastReview);
+        localStorage.setItem('habitus_lastReset_backup', oldLastReset || '');
+        localStorage.setItem('habitus_roles_backup', JSON.stringify(oldRoles));
+        
+        // Migrate tasks to new format
+        const newTasks = oldTasks.map(task => ({
+            ...task,
+            quadrant: task.quadrant?.toString() || '1', // Ensure quadrant is a string
+            role: task.role || 'Default', // Ensure role exists
+            completed: Boolean(task.completed), // Ensure completed is boolean
+            createdAt: task.createdAt || new Date().toISOString() // Ensure createdAt exists
+        }));
+        
+        // Save new data
+        localStorage.setItem('habitus_tasks', JSON.stringify(newTasks));
+        localStorage.setItem('habitus_metrics', JSON.stringify(oldMetrics));
+        localStorage.setItem('habitus_tasksLog', JSON.stringify(oldTasksLog));
+        localStorage.setItem('habitus_lastReview', oldLastReview);
+        localStorage.setItem('habitus_lastReset', oldLastReset || '');
+        localStorage.setItem('habitus_roles', JSON.stringify(oldRoles));
+        
+        // Refresh the UI
+        window.location.reload();
+        
+        App.showNotification('Data migration completed successfully', 'success');
+    } catch (error) {
+        console.error('Error during data migration:', error);
+        App.showNotification('Error during data migration', 'error');
+    }
+}
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', initApp);
+
 // Register service worker
 if ('serviceWorker' in navigator) {
-    try {
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
-        console.log('ServiceWorker registration successful:', registration);
-    } catch (err) {
-        console.error('ServiceWorker registration failed:', err);
-    }
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('service-worker.js');
+            console.log('ServiceWorker registration successful:', registration);
+        } catch (err) {
+            console.error('ServiceWorker registration failed:', err);
+        }
+    });
 }
 </script>
