@@ -41,6 +41,10 @@ const Tasks = (() => {
     let dragStartY = 0;
     let initialScrollY = 0;
     let ghostElement = null;
+    let autoScrollInterval = null;
+    const SCROLL_THRESHOLD = 60; // pixels from top/bottom to trigger scroll
+    const SCROLL_SPEED = 10; // pixels per scroll interval
+    const SCROLL_INTERVAL = 16; // ms between scrolls (roughly 60fps)
 
     // Initialize tasks module
     function init() {
@@ -572,35 +576,92 @@ const Tasks = (() => {
             let startX = 0;
             let originalScrollY = 0;
             let scrollLockHandler = null;
+            let lastTouchY = 0;
 
-            function handleDrop(dropTarget) {
-                if (!dropTarget || !dropTarget.classList.contains('task-list')) return;
+            function startAutoScroll() {
+                if (autoScrollInterval) return;
                 
-                const taskId = taskElement.dataset.taskId;
-                const task = tasks.find(t => t.id === taskId);
-                if (!task) return;
+                autoScrollInterval = setInterval(() => {
+                    if (!ghostElement) return;
+                    
+                    const ghostRect = ghostElement.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    const scrollAmount = window.scrollY;
+                    
+                    // Calculate distance from top and bottom of viewport
+                    const distanceFromTop = ghostRect.top;
+                    const distanceFromBottom = viewportHeight - ghostRect.bottom;
+                    
+                    // Determine scroll direction and speed
+                    let scrollDelta = 0;
+                    if (distanceFromTop < SCROLL_THRESHOLD) {
+                        // Scroll up
+                        scrollDelta = -SCROLL_SPEED * (1 - distanceFromTop / SCROLL_THRESHOLD);
+                    } else if (distanceFromBottom < SCROLL_THRESHOLD) {
+                        // Scroll down
+                        scrollDelta = SCROLL_SPEED * (1 - distanceFromBottom / SCROLL_THRESHOLD);
+                    }
+                    
+                    if (scrollDelta !== 0) {
+                        window.scrollBy(0, scrollDelta);
+                        // Update ghost position to account for scroll
+                        if (ghostElement) {
+                            const currentTop = parseInt(ghostElement.style.top);
+                            ghostElement.style.top = `${currentTop + scrollDelta}px`;
+                        }
+                    }
+                }, SCROLL_INTERVAL);
+            }
 
-                const targetType = dropTarget.dataset.type;
-                const targetValue = dropTarget.dataset.target;
-                
-                if (targetType === 'role' && task.role !== targetValue) {
-                    task.role = targetValue;
-                    saveData();
-                    updateUI();
-                } else if (targetType === 'quadrant' && task.quadrant !== targetValue) {
-                    task.quadrant = targetValue;
-                    saveData();
-                    updateUI();
+            function stopAutoScroll() {
+                if (autoScrollInterval) {
+                    clearInterval(autoScrollInterval);
+                    autoScrollInterval = null;
                 }
             }
 
-            function findDropTarget(x, y) {
-                const elements = document.elementsFromPoint(x, y);
-                return elements.find(el => el.classList.contains('task-list'));
+            function handleDragMove(e, touch = false) {
+                if (!isDragging) return;
+                e.preventDefault();
+                
+                const clientY = touch ? e.touches[0].clientY : e.clientY;
+                const clientX = touch ? e.touches[0].clientX : e.clientX;
+                const deltaY = clientY - startY;
+                lastTouchY = clientY;
+                
+                // Update ghost position
+                if (ghostElement) {
+                    const newTop = parseInt(ghostElement.style.top) + deltaY;
+                    ghostElement.style.top = `${newTop}px`;
+                    
+                    // Check if we need to start auto-scrolling
+                    const ghostRect = ghostElement.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    
+                    if (ghostRect.top < SCROLL_THRESHOLD || 
+                        (viewportHeight - ghostRect.bottom) < SCROLL_THRESHOLD) {
+                        startAutoScroll();
+                    } else {
+                        stopAutoScroll();
+                    }
+                }
+                startY = clientY;
+                
+                // Find and update drop target
+                const dropTarget = findDropTarget(clientX, clientY);
+                document.querySelectorAll('.task-list').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                if (dropTarget) {
+                    dropTarget.classList.add('drag-over');
+                }
             }
 
             function cleanupDrag() {
                 if (!isDragging) return;
+                
+                // Stop auto-scrolling
+                stopAutoScroll();
                 
                 // Remove scroll prevention
                 if (scrollLockHandler) {
@@ -632,6 +693,32 @@ const Tasks = (() => {
                 });
                 
                 isDragging = false;
+            }
+
+            function handleDrop(dropTarget) {
+                if (!dropTarget || !dropTarget.classList.contains('task-list')) return;
+                
+                const taskId = taskElement.dataset.taskId;
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                const targetType = dropTarget.dataset.type;
+                const targetValue = dropTarget.dataset.target;
+                
+                if (targetType === 'role' && task.role !== targetValue) {
+                    task.role = targetValue;
+                    saveData();
+                    updateUI();
+                } else if (targetType === 'quadrant' && task.quadrant !== targetValue) {
+                    task.quadrant = targetValue;
+                    saveData();
+                    updateUI();
+                }
+            }
+
+            function findDropTarget(x, y) {
+                const elements = document.elementsFromPoint(x, y);
+                return elements.find(el => el.classList.contains('task-list'));
             }
 
             function startDrag(e, touch = false) {
@@ -683,31 +770,6 @@ const Tasks = (() => {
                 taskElement.classList.add('dragging');
 
                 return { clientY, clientX };
-            }
-
-            function handleDragMove(e, touch = false) {
-                if (!isDragging) return;
-                e.preventDefault();
-                
-                const clientY = touch ? e.touches[0].clientY : e.clientY;
-                const clientX = touch ? e.touches[0].clientX : e.clientX;
-                const deltaY = clientY - startY;
-                
-                // Update ghost position
-                if (ghostElement) {
-                    const newTop = parseInt(ghostElement.style.top) + deltaY;
-                    ghostElement.style.top = `${newTop}px`;
-                }
-                startY = clientY;
-                
-                // Find and update drop target
-                const dropTarget = findDropTarget(clientX, clientY);
-                document.querySelectorAll('.task-list').forEach(el => {
-                    el.classList.remove('drag-over');
-                });
-                if (dropTarget) {
-                    dropTarget.classList.add('drag-over');
-                }
             }
 
             function endDrag(e, touch = false) {
