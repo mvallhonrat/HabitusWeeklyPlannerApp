@@ -501,8 +501,8 @@ const Tasks = (() => {
             let ghostElement = null;
             let startY = 0;
             let startX = 0;
-            let offsetY = 0;
             let originalScrollY = 0;
+            let scrollLockHandler = null;
 
             function handleDrop(dropTarget) {
                 if (!dropTarget || !dropTarget.classList.contains('task-list')) return;
@@ -530,18 +530,53 @@ const Tasks = (() => {
                 return elements.find(el => el.classList.contains('task-list'));
             }
 
-            handle.addEventListener('touchstart', function(e) {
+            function cleanupDrag() {
+                if (!isDragging) return;
+                
+                // Remove scroll prevention
+                if (scrollLockHandler) {
+                    window.removeEventListener('scroll', scrollLockHandler);
+                    scrollLockHandler = null;
+                }
+                
+                // Restore body scroll
+                document.body.classList.remove('dragging');
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.height = '';
+                
+                // Restore original element
+                if (taskElement) {
+                    taskElement.style.visibility = '';
+                    taskElement.classList.remove('dragging');
+                }
+                
+                // Cleanup ghost element
+                if (ghostElement && ghostElement.parentNode) {
+                    ghostElement.parentNode.removeChild(ghostElement);
+                    ghostElement = null;
+                }
+                
+                // Cleanup drop targets
+                document.querySelectorAll('.task-list').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                
+                isDragging = false;
+            }
+
+            function startDrag(e, touch = false) {
                 if (e.target !== handle) return;
                 
                 e.preventDefault();
                 e.stopPropagation();
                 
-                const touch = e.touches[0];
+                const clientY = touch ? e.touches[0].clientY : e.clientY;
+                const clientX = touch ? e.touches[0].clientX : e.clientX;
                 const rect = taskElement.getBoundingClientRect();
                 
-                startY = touch.clientY;
-                startX = touch.clientX;
-                offsetY = touch.clientY - rect.top;
+                startY = clientY;
+                startX = clientX;
                 originalScrollY = window.scrollY;
                 
                 // Create ghost
@@ -552,155 +587,129 @@ const Tasks = (() => {
                 ghostElement.style.height = `${rect.height}px`;
                 ghostElement.style.left = `${rect.left}px`;
                 ghostElement.style.top = `${rect.top}px`;
+                ghostElement.style.zIndex = '1000';
+                ghostElement.style.opacity = '0.8';
+                ghostElement.style.pointerEvents = 'none';
+                ghostElement.style.transform = 'translateZ(0)';
                 document.body.appendChild(ghostElement);
                 
+                // Hide original element
+                taskElement.style.visibility = 'hidden';
+                
+                // Prevent scrolling
+                scrollLockHandler = () => {
+                    window.scrollTo(0, originalScrollY);
+                };
+                
                 // Lock body scroll
-                document.body.style.position = 'fixed';
-                document.body.style.top = `-${originalScrollY}px`;
-                document.body.style.width = '100%';
+                document.body.classList.add('dragging');
                 document.body.style.overflow = 'hidden';
+                document.body.style.position = 'relative';
+                document.body.style.height = '100%';
+                
+                // Add scroll prevention
+                window.addEventListener('scroll', scrollLockHandler, { passive: false });
                 
                 isDragging = true;
                 taskElement.classList.add('dragging');
 
-                function onTouchMove(e) {
-                    if (!isDragging) return;
-                    e.preventDefault();
-                    
-                    const touch = e.touches[0];
-                    const deltaY = touch.clientY - startY;
-                    
-                    // Update ghost position
+                return { clientY, clientX };
+            }
+
+            function handleDragMove(e, touch = false) {
+                if (!isDragging) return;
+                e.preventDefault();
+                
+                const clientY = touch ? e.touches[0].clientY : e.clientY;
+                const clientX = touch ? e.touches[0].clientX : e.clientX;
+                const deltaY = clientY - startY;
+                
+                // Update ghost position
+                if (ghostElement) {
                     const newTop = parseInt(ghostElement.style.top) + deltaY;
                     ghostElement.style.top = `${newTop}px`;
-                    startY = touch.clientY;
-                    
-                    // Find and update drop target
-                    const dropTarget = findDropTarget(touch.clientX, touch.clientY);
-                    document.querySelectorAll('.task-list').forEach(el => {
-                        el.classList.remove('drag-over');
-                    });
-                    if (dropTarget) {
-                        dropTarget.classList.add('drag-over');
-                    }
+                }
+                startY = clientY;
+                
+                // Find and update drop target
+                const dropTarget = findDropTarget(clientX, clientY);
+                document.querySelectorAll('.task-list').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                if (dropTarget) {
+                    dropTarget.classList.add('drag-over');
+                }
+            }
+
+            function endDrag(e, touch = false) {
+                if (!isDragging) return;
+                e.preventDefault();
+                
+                const clientX = touch ? e.changedTouches[0].clientX : e.clientX;
+                const clientY = touch ? e.changedTouches[0].clientY : e.clientY;
+                const dropTarget = findDropTarget(clientX, clientY);
+                
+                // Handle drop first
+                handleDrop(dropTarget);
+                
+                // Then cleanup immediately
+                cleanupDrag();
+            }
+
+            // Touch events
+            handle.addEventListener('touchstart', function(e) {
+                const coords = startDrag(e, true);
+                if (!coords) return;
+
+                function onTouchMove(e) {
+                    handleDragMove(e, true);
                 }
 
                 function onTouchEnd(e) {
-                    if (!isDragging) return;
-                    e.preventDefault();
-                    
-                    const touch = e.changedTouches[0];
-                    const dropTarget = findDropTarget(touch.clientX, touch.clientY);
-                    
-                    // Restore body scroll
-                    document.body.style.position = '';
-                    document.body.style.top = '';
-                    document.body.style.width = '';
-                    document.body.style.overflow = '';
-                    window.scrollTo(0, originalScrollY);
-                    
-                    // Cleanup
-                    isDragging = false;
-                    taskElement.classList.remove('dragging');
-                    if (ghostElement) {
-                        ghostElement.remove();
-                        ghostElement = null;
-                    }
-                    
-                    // Remove event listeners
+                    endDrag(e, true);
                     document.removeEventListener('touchmove', onTouchMove);
                     document.removeEventListener('touchend', onTouchEnd);
-                    document.removeEventListener('touchcancel', onTouchEnd);
-                    
-                    // Handle drop
-                    handleDrop(dropTarget);
-                    
-                    // Cleanup drop targets
-                    document.querySelectorAll('.task-list').forEach(el => {
-                        el.classList.remove('drag-over');
-                    });
+                    document.removeEventListener('touchcancel', onTouchCancel);
+                }
+
+                function onTouchCancel(e) {
+                    cleanupDrag();
+                    document.removeEventListener('touchmove', onTouchMove);
+                    document.removeEventListener('touchend', onTouchEnd);
+                    document.removeEventListener('touchcancel', onTouchCancel);
                 }
 
                 document.addEventListener('touchmove', onTouchMove, { passive: false });
                 document.addEventListener('touchend', onTouchEnd);
-                document.addEventListener('touchcancel', onTouchEnd);
+                document.addEventListener('touchcancel', onTouchCancel);
             }, { passive: false });
 
             // Mouse events
             handle.addEventListener('mousedown', function(e) {
-                if (e.target !== handle) return;
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const rect = taskElement.getBoundingClientRect();
-                startY = e.clientY;
-                startX = e.clientX;
-                offsetY = e.clientY - rect.top;
-                
-                // Create ghost
-                ghostElement = taskElement.cloneNode(true);
-                ghostElement.classList.add('task-ghost');
-                ghostElement.style.position = 'fixed';
-                ghostElement.style.width = `${rect.width}px`;
-                ghostElement.style.height = `${rect.height}px`;
-                ghostElement.style.left = `${rect.left}px`;
-                ghostElement.style.top = `${rect.top}px`;
-                document.body.appendChild(ghostElement);
-                
-                isDragging = true;
-                taskElement.classList.add('dragging');
+                const coords = startDrag(e);
+                if (!coords) return;
 
                 function onMouseMove(e) {
-                    if (!isDragging) return;
-                    e.preventDefault();
-                    
-                    const deltaY = e.clientY - startY;
-                    
-                    // Update ghost position
-                    const newTop = parseInt(ghostElement.style.top) + deltaY;
-                    ghostElement.style.top = `${newTop}px`;
-                    startY = e.clientY;
-                    
-                    // Find and update drop target
-                    const dropTarget = findDropTarget(e.clientX, e.clientY);
-                    document.querySelectorAll('.task-list').forEach(el => {
-                        el.classList.remove('drag-over');
-                    });
-                    if (dropTarget) {
-                        dropTarget.classList.add('drag-over');
-                    }
+                    handleDragMove(e);
                 }
 
                 function onMouseUp(e) {
-                    if (!isDragging) return;
-                    e.preventDefault();
-                    
-                    const dropTarget = findDropTarget(e.clientX, e.clientY);
-                    
-                    // Cleanup
-                    isDragging = false;
-                    taskElement.classList.remove('dragging');
-                    if (ghostElement) {
-                        ghostElement.remove();
-                        ghostElement = null;
-                    }
-                    
-                    // Remove event listeners
+                    endDrag(e);
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
-                    
-                    // Handle drop
-                    handleDrop(dropTarget);
-                    
-                    // Cleanup drop targets
-                    document.querySelectorAll('.task-list').forEach(el => {
-                        el.classList.remove('drag-over');
-                    });
+                    document.removeEventListener('mouseleave', onMouseLeave);
+                }
+
+                function onMouseLeave(e) {
+                    cleanupDrag();
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    document.removeEventListener('mouseleave', onMouseLeave);
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('mouseleave', onMouseLeave);
             });
         });
     }
@@ -1066,29 +1075,20 @@ window.Tasks = Tasks;
 // The initialization will be handled by the main initApp function 
 
 function renderTask(task, index) {
-    const quadrantColors = {
-        '1': 'bg-red-100 border-red-200',
-        '2': 'bg-green-100 border-green-200',
-        '3': 'bg-yellow-100 border-yellow-200',
-        '4': 'bg-gray-100 border-gray-200'
-    };
-
-    const colorClass = quadrantColors[task.quadrant] || 'bg-white border-gray-200';
+    const quadrantClass = `q${task.quadrant}`;
     
     return `
-        <div class="task-item ${colorClass} border rounded shadow-sm flex items-center" 
+        <div class="task-item ${quadrantClass} border rounded shadow-sm" 
              data-task-id="${task.id}" 
              data-role="${task.role}" 
              data-quadrant="${task.quadrant}">
             <div class="drag-handle">⋮⋮</div>
-            <div class="task-content flex-1 flex items-center">
+            <div class="task-content">
                 <input type="checkbox" 
-                       class="mr-2" 
                        ${task.completed ? 'checked' : ''} 
                        onchange="Tasks.toggleTaskComplete('${task.id}')">
-                <span class="flex-1 ${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</span>
-                <button class="text-red-500 hover:text-red-700 ml-2" 
-                        onclick="Tasks.deleteTask('${task.id}')">×</button>
+                <span class="${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</span>
+                <button onclick="Tasks.deleteTask('${task.id}')">×</button>
             </div>
         </div>
     `;
