@@ -61,6 +61,9 @@ const Tasks = (() => {
 
         // Load saved data
         loadData();
+        
+        // Migrate metrics data if needed
+        migrateMetricsData();
 
         // Set up event listeners
         setupEventListeners();
@@ -218,6 +221,38 @@ const Tasks = (() => {
                 lastReviewBox.classList.remove('hidden');
                 lastReviewSpan.textContent = lastReviewText;
             }
+        }
+    }
+
+    // Add this function after loadData and before saveData
+    function migrateMetricsData() {
+        if (!metrics || !Array.isArray(metrics)) return;
+        
+        let needsMigration = false;
+        const migratedMetrics = metrics.map(metric => {
+            // Check if timestamp is a string date
+            if (typeof metric.timestamp === 'string' && !metric.timestamp.match(/^\d+$/)) {
+                needsMigration = true;
+                return {
+                    ...metric,
+                    timestamp: new Date(metric.timestamp).getTime()
+                };
+            }
+            // Check if timestamp is a number but in wrong format
+            if (typeof metric.timestamp === 'number' && metric.timestamp < 1000000000000) {
+                needsMigration = true;
+                return {
+                    ...metric,
+                    timestamp: metric.timestamp * 1000 // Convert seconds to milliseconds if needed
+                };
+            }
+            return metric;
+        });
+
+        if (needsMigration) {
+            metrics = migratedMetrics;
+            saveData();
+            App.showNotification(Translations.getTranslation('notifications.data_migrated'), 'success');
         }
     }
 
@@ -878,9 +913,18 @@ const Tasks = (() => {
         return [completed, pending];
     }
 
-    // Prepare historical data
+    // Update the prepareHistoricalData function
     function prepareHistoricalData() {
-        const labels = metrics.map(m => new Date(m.timestamp).toLocaleDateString());
+        // Ensure metrics are migrated
+        migrateMetricsData();
+        
+        const labels = metrics.map(m => {
+            const timestamp = typeof m.timestamp === 'string' ? 
+                new Date(m.timestamp).getTime() : 
+                m.timestamp;
+            return new Date(timestamp).toLocaleDateString();
+        });
+        
         const completionPercentages = metrics.map(m => 
             m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0
         );
@@ -1064,7 +1108,8 @@ const Tasks = (() => {
         getTask,
         saveData,
         updateUI,
-        initDragAndDrop
+        initDragAndDrop,
+        migrateMetricsData
     };
 })();
 
