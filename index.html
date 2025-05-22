@@ -366,15 +366,148 @@ async function migrateData() {
     try {
         console.log('Starting data migration...');
         
-        // Get all localStorage keys
-        const keys = Object.keys(localStorage);
+        // Get all localStorage keys for debugging
+        const allKeys = Object.keys(localStorage);
+        console.log('All localStorage keys:', allKeys);
+        
         const migrationLog = [];
         
+        // Function to safely parse JSON
+        function safeJSONParse(str, key) {
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                console.error(`Error parsing ${key}:`, e);
+                return null;
+            }
+        }
+
+        // Helper to validate and convert dates
+        function parseToISO(dateStr) {
+            if (!dateStr || dateStr.includes('T')) return dateStr;
+            const parts = dateStr.split(/[\/\-\.]/);
+            if (parts.length === 3) {
+                // Detect European date format DD/MM/YYYY
+                const [d, m, y] = parts.map(p => parseInt(p, 10));
+                const iso = new Date(y, m - 1, d);
+                return !isNaN(iso.getTime()) ? iso.toISOString() : dateStr;
+            }
+            const d = new Date(dateStr);
+            return !isNaN(d.getTime()) ? d.toISOString() : dateStr;
+        }
+
+        // Function to normalize task data
+        function normalizeTask(task, source = 'unknown') {
+            console.log(`Normalizing task from ${source}:`, task);
+            
+            // Try to find the task description in various possible fields
+            let description = null;
+            if (typeof task === 'string') {
+                description = task;
+            } else if (task && typeof task === 'object') {
+                description = task.description || task.text || task.name || task.task || task.content || task.title;
+            }
+            
+            // If we still don't have a description, try to stringify the task
+            if (!description && task) {
+                try {
+                    description = JSON.stringify(task);
+                } catch (e) {
+                    description = 'Task without description';
+                }
+            }
+
+            // Handle dates from previous version
+            let createdAt = task?.createdAt || task?.createdDate || new Date().toISOString();
+            let completedAt = task?.completedAt || task?.completedDate;
+            
+            // Convert dates to ISO format if needed
+            createdAt = parseToISO(createdAt);
+            if (completedAt) {
+                completedAt = parseToISO(completedAt);
+            }
+            
+            // Create normalized task object
+            const normalizedTask = {
+                id: task?.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                description: description || 'Task without description',
+                role: task?.role || 'Unassigned',
+                quadrant: task?.quadrant || '1',
+                completed: !!task?.completed,
+                createdAt: createdAt,
+                completedAt: completedAt || null
+            };
+            
+            console.log('Normalized task:', normalizedTask);
+            return normalizedTask;
+        }
+
+        // Try to find tasks in various possible locations
+        const possibleTaskKeys = [
+            'habitus_tasks',  // Primary key from both versions
+            'tasks',
+            'weekly_tasks',
+            'current_tasks',
+            'saved_tasks',
+            'task_list'
+        ];
+
+        let foundTasks = [];
+        let sourceKey = null;
+
+        // Look for tasks in all possible keys
+        for (const key of possibleTaskKeys) {
+            const storedData = localStorage.getItem(key);
+            if (storedData) {
+                console.log(`Found data in ${key}:`, storedData);
+                const parsedData = safeJSONParse(storedData, key);
+                
+                if (parsedData) {
+                    if (Array.isArray(parsedData)) {
+                        foundTasks = parsedData;
+                        sourceKey = key;
+                        console.log(`Found array of tasks in ${key}`);
+                        break;
+                    } else if (typeof parsedData === 'object') {
+                        // Try to find tasks array in object
+                        const possibleArrays = Object.values(parsedData).filter(val => Array.isArray(val));
+                        if (possibleArrays.length > 0) {
+                            foundTasks = possibleArrays[0];
+                            sourceKey = key;
+                            console.log(`Found tasks array in object from ${key}`);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we found tasks, migrate them
+        if (foundTasks.length > 0) {
+            console.log(`Migrating ${foundTasks.length} tasks from ${sourceKey}`);
+            
+            // Normalize all tasks
+            const normalizedTasks = foundTasks.map(task => normalizeTask(task, sourceKey));
+            
+            // Save normalized tasks
+            localStorage.setItem('habitus_tasks', JSON.stringify(normalizedTasks));
+            
+            // Remove old tasks if they're not the same as the new key
+            if (sourceKey !== 'habitus_tasks') {
+                localStorage.removeItem(sourceKey);
+            }
+            
+            migrationLog.push(`Migrated ${normalizedTasks.length} tasks from ${sourceKey}`);
+            
+            // Log some examples of migrated tasks
+            console.log('Example of migrated tasks:', normalizedTasks.slice(0, 3));
+        }
+
         // Migrate roles
         const oldRoles = localStorage.getItem('roles');
         if (oldRoles) {
             try {
-                const roles = JSON.parse(oldRoles);
+                const roles = safeJSONParse(oldRoles, 'roles');
                 if (Array.isArray(roles)) {
                     localStorage.setItem('habitus_roles', JSON.stringify(roles));
                     localStorage.removeItem('roles');
@@ -384,107 +517,74 @@ async function migrateData() {
                 console.error('Error migrating roles:', e);
             }
         }
-        
-        // Migrate tasks
-        const oldTasks = localStorage.getItem('tasks');
-        if (oldTasks) {
-            try {
-                const tasks = JSON.parse(oldTasks);
-                if (Array.isArray(tasks)) {
-                    // Update task format if needed
-                    const updatedTasks = tasks.map(task => {
-                        // Log the task for debugging
-                        console.log('Migrating task:', task);
-                        
-                        // Ensure all required fields are present
-                        return {
-                            id: task.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                            description: task.description || task.text || task.name || 'Task without description',
-                            role: task.role || 'Unassigned',
-                            quadrant: task.quadrant || '1',
-                            completed: !!task.completed,
-                            createdAt: task.createdAt || new Date().toISOString()
-                        };
-                    });
-                    
-                    // Log the updated tasks for debugging
-                    console.log('Updated tasks:', updatedTasks);
-                    
-                    localStorage.setItem('habitus_tasks', JSON.stringify(updatedTasks));
-                    localStorage.removeItem('tasks');
-                    migrationLog.push('Tasks migrated successfully');
-                }
-            } catch (e) {
-                console.error('Error migrating tasks:', e);
-            }
-        }
-        
+
         // Migrate metrics
-        const oldMetrics = localStorage.getItem('metrics');
+        const oldMetrics = localStorage.getItem('habitus_metrics');
         if (oldMetrics) {
             try {
-                const metrics = JSON.parse(oldMetrics);
+                const metrics = safeJSONParse(oldMetrics, 'metrics');
                 if (Array.isArray(metrics)) {
-                    localStorage.setItem('habitus_metrics', JSON.stringify(metrics));
-                    localStorage.removeItem('metrics');
+                    // Update date formats in metrics
+                    const updatedMetrics = metrics.map(metric => {
+                        if (metric.fecha) {
+                            metric.fecha = parseToISO(metric.fecha);
+                        }
+                        return metric;
+                    });
+                    localStorage.setItem('habitus_metrics', JSON.stringify(updatedMetrics));
                     migrationLog.push('Metrics migrated successfully');
                 }
             } catch (e) {
                 console.error('Error migrating metrics:', e);
             }
         }
-        
+
         // Migrate task log
-        const oldTasksLog = localStorage.getItem('tasksLog');
+        const oldTasksLog = localStorage.getItem('habitus_tasksLog');
         if (oldTasksLog) {
             try {
-                const tasksLog = JSON.parse(oldTasksLog);
+                const tasksLog = safeJSONParse(oldTasksLog, 'tasksLog');
                 if (Array.isArray(tasksLog)) {
-                    // Update task log format if needed
                     const updatedTasksLog = tasksLog.map(log => ({
                         timestamp: log.timestamp || Date.now(),
-                        tasks: (log.tasks || []).map(task => ({
-                            id: task.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                            description: task.description || task.text || task.name || 'Task without description',
-                            role: task.role || 'Unassigned',
-                            quadrant: task.quadrant || '1',
-                            completed: !!task.completed,
-                            createdAt: task.createdAt || new Date().toISOString()
-                        }))
+                        fechaCreacion: parseToISO(log.fechaCreacion || log.timestamp),
+                        fechaFin: parseToISO(log.fechaFin),
+                        tasks: (log.tasks || []).map(task => normalizeTask(task, 'tasksLog'))
                     }));
                     
                     localStorage.setItem('habitus_tasksLog', JSON.stringify(updatedTasksLog));
-                    localStorage.removeItem('tasksLog');
                     migrationLog.push('Task log migrated successfully');
                 }
             } catch (e) {
                 console.error('Error migrating task log:', e);
             }
         }
-        
+
         // Migrate review
-        const oldReview = localStorage.getItem('lastReview');
+        const oldReview = localStorage.getItem('habitus_lastReview');
         if (oldReview) {
             try {
                 localStorage.setItem('habitus_lastReview', oldReview);
-                localStorage.removeItem('lastReview');
                 migrationLog.push('Review migrated successfully');
             } catch (e) {
                 console.error('Error migrating review:', e);
             }
         }
-        
+
         // Show migration results
         if (migrationLog.length > 0) {
-            App.showNotification('Data migration completed successfully', 'success');
-            console.log('Migration log:', migrationLog);
+            const message = `Data migration completed: ${migrationLog.join(', ')}`;
+            console.log(message);
+            App.showNotification(message, 'success');
             
             // Refresh the page to apply migrated data
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
         } else {
-            App.showNotification('No data to migrate found', 'info');
+            const message = 'No data to migrate found. Please check the console for details.';
+            console.log(message);
+            App.showNotification(message, 'info');
         }
     } catch (error) {
         console.error('Error during data migration:', error);
