@@ -57,6 +57,10 @@ const Translations = (() => {
         chart_quadrants_title: "Tareas por Cuadrante por Semana",
         chart_roles_title: "Roles Activos por Semana",
         
+        // Export buttons
+        export_metrics: "📊 Exportar Métricas",
+        export_tasks: "📋 Exportar Tareas",
+        
         // Notifications
         notifications: {
             task_added: "Tarea añadida correctamente",
@@ -138,5 +142,6 @@ const Translations = (() => {
 
 // Make Translations available globally
 window.Translations = Translations;
+
 
 
