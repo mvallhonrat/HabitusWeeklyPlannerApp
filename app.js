@@ -177,24 +177,149 @@ const App = (() => {
     function showNotification(message, type = 'info') {
         // Create notification element
         const notification = document.createElement('div');
-        notification.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg transform transition-transform duration-300 translate-y-0 ${
+        notification.className = `fixed bottom-20 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 max-w-sm z-50 ${
             type === 'error' ? 'bg-red-500 text-white' :
             type === 'success' ? 'bg-green-500 text-white' :
             type === 'warning' ? 'bg-yellow-500 text-white' :
             'bg-blue-500 text-white'
         }`;
-        notification.textContent = message;
+
+        // Special styling for feedback success
+        if (message.includes('feedback') && type === 'success') {
+            notification.className += ' bg-indigo-500 text-white';
+            notification.innerHTML = `<p class="font-medium">${message}</p>`;
+        } else {
+            notification.textContent = message;
+        }
 
         // Add to document
         document.body.appendChild(notification);
 
-        // Remove after delay
+        // Add entrance animation
+        requestAnimationFrame(() => {
+            notification.style.transform = 'translateY(0) scale(1)';
+            notification.style.opacity = '1';
+        });
+
+        // Remove after delay with exit animation
         setTimeout(() => {
-            notification.classList.add('translate-y-full');
+            notification.style.transform = 'translateY(100%) scale(0.95)';
+            notification.style.opacity = '0';
             setTimeout(() => {
-                document.body.removeChild(notification);
+                if (notification.parentNode) {
+                    document.body.removeChild(notification);
+                }
             }, 300);
-        }, 3000);
+        }, 4000); // Show for 4 seconds
+    }
+
+    // Feedback functionality
+    function showFeedbackModal() {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Focus the textarea
+            const textarea = document.getElementById('feedbackInput');
+            if (textarea) {
+                textarea.focus();
+            }
+        }
+    }
+
+    function hideFeedbackModal() {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            // Clear the textarea
+            const textarea = document.getElementById('feedbackInput');
+            if (textarea) {
+                textarea.value = '';
+            }
+        }
+    }
+
+    async function sendFeedback() {
+        const textarea = document.getElementById('feedbackInput');
+        if (!textarea || !textarea.value.trim()) {
+            showNotification(Translations.getTranslation('feedback_empty'), 'error');
+            return;
+        }
+
+        const feedback = {
+            text: textarea.value.trim(),
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            language: localStorage.getItem('habitus_lang') || 'es',
+            version: '1.0.3'
+        };
+
+        // Store feedback in localStorage as backup
+        const storedFeedback = JSON.parse(localStorage.getItem('habitus_feedback') || '[]');
+        storedFeedback.push(feedback);
+        localStorage.setItem('habitus_feedback', JSON.stringify(storedFeedback));
+
+        try {
+            // Submit to Google Form
+            const formData = new FormData();
+            
+            // Get current date and time
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            
+            // Map feedback to form fields using provided entry IDs
+            formData.append('entry.139403842', feedback.text); // Feedback text
+            formData.append('entry.1727937598', feedback.language); // Language
+            formData.append('entry.9141795', feedback.version); // Version
+            formData.append('entry.1975576551', feedback.userAgent); // User Agent
+            formData.append('entry.1060868168_hour', hours); // Hour
+            formData.append('entry.1060868168_minute', minutes); // Minute
+
+            // Submit to the Google Form with the complete URL
+            const response = await fetch('https://docs.google.com/forms/d/e/1FAIpQLSfvesAJ3czHCvXQTAWoaE2sEg48sh-uTrz6EejQHbm2e7FePg/formResponse', {
+                method: 'POST',
+                mode: 'no-cors', // Required for Google Forms
+                body: formData
+            });
+
+            // Clear and hide modal
+            textarea.value = '';
+            hideFeedbackModal();
+
+            // Show success notification
+            showNotification(Translations.getTranslation('feedback_sent'), 'success');
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            // Even if Google Form submission fails, we still have the data in localStorage
+            showNotification(Translations.getTranslation('feedback_sent') + ' (offline)', 'success');
+        }
+    }
+
+    // Export feedback to CSV
+    function exportFeedback() {
+        const storedFeedback = JSON.parse(localStorage.getItem('habitus_feedback') || '[]');
+        if (storedFeedback.length === 0) {
+            showNotification(Translations.getTranslation('feedback_empty'), 'error');
+            return;
+        }
+
+        const headers = ['Timestamp', 'Feedback', 'Language', 'Version', 'User Agent'];
+        const rows = storedFeedback.map(f => [
+            new Date(f.timestamp).toLocaleString(),
+            f.text,
+            f.language,
+            f.version,
+            f.userAgent
+        ]);
+
+        const csv = [headers, ...rows].map(row => row.map(cell => 
+            // Escape commas and quotes in cells
+            typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
+        ).join(',')).join('\n');
+
+        downloadCSV(csv, 'habitus-feedback.csv');
     }
 
     // Public API
@@ -202,7 +327,11 @@ const App = (() => {
         init,
         showNotification,
         toggleTheme,
-        toggleInstructions
+        toggleInstructions,
+        showFeedbackModal,
+        hideFeedbackModal,
+        sendFeedback,
+        exportFeedback
     };
 })();
 

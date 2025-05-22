@@ -127,6 +127,33 @@
     .lang-switch:not(.active) .lang-switch-text.en {
         color: #4b5563;
     }
+
+    /* Feedback bubble styles */
+    #feedbackBubble {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease-in-out;
+    }
+
+    #feedbackBubble:hover {
+        transform: scale(1.1);
+    }
+
+    #feedbackBubble:active {
+        transform: scale(0.95);
+    }
+
+    /* Ensure modal is above the bubble */
+    #feedbackModal {
+        z-index: 50;
+    }
+
+    /* Add safe area padding for iOS devices */
+    @supports (padding: max(0px)) {
+        #feedbackBubble {
+            bottom: max(1.5rem, env(safe-area-inset-bottom) + 1rem);
+            right: max(1.5rem, env(safe-area-inset-right) + 1rem);
+        }
+    }
 </style>
 <link rel="stylesheet" href="styles.css">
 <link href="./icons/icon-192x192.png" rel="icon" type="image/png"/></head>
@@ -336,13 +363,43 @@ document.addEventListener('DOMContentLoaded', showRandomVerse);
 </div>
 <!-- Botones de exportación -->
 <div class="mb-4 grid grid-cols-2 gap-2">
-  <button class="bg-gray-300 text-gray-800 text-sm px-4 py-3 rounded hover:bg-gray-400 active:bg-gray-500 touch-manipulation" data-i18n="export_metrics" id="exportMetricsBtn">
+  <button class="bg-gray-300 text-gray-800 text-sm px-4 py-3 rounded hover:bg-gray-400 active:bg-gray-500 touch-manipulation" data-i18n="export_metrics" onclick="Tasks.exportMetrics()">
     📥 Exportar Métricas
   </button>
-  <button class="bg-gray-300 text-gray-800 text-sm px-4 py-3 rounded hover:bg-gray-400 active:bg-gray-500 touch-manipulation" data-i18n="export_tasks" id="exportTasksBtn">
+  <button class="bg-gray-300 text-gray-800 text-sm px-4 py-3 rounded hover:bg-gray-400 active:bg-gray-500 touch-manipulation" data-i18n="export_tasks" onclick="Tasks.exportTasks()">
     📥 Exportar Tareas
   </button>
 </div>
+
+<!-- Add floating feedback button -->
+<button id="feedbackBubble" 
+        class="fixed bottom-6 right-6 w-14 h-14 bg-indigo-500 text-white rounded-full shadow-lg hover:bg-indigo-600 active:bg-indigo-700 flex items-center justify-center text-2xl transition-transform hover:scale-110 touch-manipulation z-40"
+        onclick="App.showFeedbackModal()"
+        data-i18n-title="feedback_title"
+        title="Enviar Feedback">
+    💬
+</button>
+
+<!-- Keep the existing modal code -->
+<div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 m-4 max-w-lg w-full">
+        <h3 class="text-lg font-semibold mb-4" data-i18n="feedback_title">Enviar Feedback</h3>
+        <textarea id="feedbackInput" 
+                  class="w-full border rounded px-3 py-2 text-sm mb-4" 
+                  rows="4" 
+                  data-i18n-placeholder="feedback_placeholder"
+                  placeholder="Escribe aquí tus sugerencias, mejoras o reporta algún error..."></textarea>
+        <div class="flex justify-end gap-2">
+            <button class="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400" 
+                    onclick="App.hideFeedbackModal()" 
+                    data-i18n="cancel">Cancelar</button>
+            <button class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600" 
+                    onclick="App.sendFeedback()" 
+                    data-i18n="send">Enviar</button>
+        </div>
+    </div>
+</div>
+
 <!-- Botón de migración -->
 <div class="mb-4">
   <button id="migrateDataBtn" class="bg-blue-500 text-white text-sm px-4 py-3 rounded hover:bg-blue-600 active:bg-blue-700 w-full touch-manipulation">

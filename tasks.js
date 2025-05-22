@@ -42,9 +42,11 @@ const Tasks = (() => {
     let initialScrollY = 0;
     let ghostElement = null;
     let autoScrollInterval = null;
-    const SCROLL_THRESHOLD = 60; // pixels from top/bottom to trigger scroll
-    const SCROLL_SPEED = 10; // pixels per scroll interval
+    let lastTouchY = 0;
+    const SCROLL_THRESHOLD = 80; // pixels from top/bottom to trigger scroll
+    const SCROLL_SPEED = 15; // pixels per scroll interval
     const SCROLL_INTERVAL = 16; // ms between scrolls (roughly 60fps)
+    const SCROLL_ACCELERATION = 1.5; // multiplier for scroll speed when holding at edge
 
     // Initialize tasks module
     function init() {
@@ -577,16 +579,20 @@ const Tasks = (() => {
             let originalScrollY = 0;
             let scrollLockHandler = null;
             let lastTouchY = 0;
+            let scrollAcceleration = 1;
+            let lastScrollTime = 0;
 
             function startAutoScroll() {
                 if (autoScrollInterval) return;
                 
+                lastScrollTime = Date.now();
                 autoScrollInterval = setInterval(() => {
                     if (!ghostElement) return;
                     
                     const ghostRect = ghostElement.getBoundingClientRect();
                     const viewportHeight = window.innerHeight;
-                    const scrollAmount = window.scrollY;
+                    const currentTime = Date.now();
+                    const timeSinceLastScroll = currentTime - lastScrollTime;
                     
                     // Calculate distance from top and bottom of viewport
                     const distanceFromTop = ghostRect.top;
@@ -595,20 +601,30 @@ const Tasks = (() => {
                     // Determine scroll direction and speed
                     let scrollDelta = 0;
                     if (distanceFromTop < SCROLL_THRESHOLD) {
-                        // Scroll up
-                        scrollDelta = -SCROLL_SPEED * (1 - distanceFromTop / SCROLL_THRESHOLD);
+                        // Scroll up with acceleration
+                        scrollDelta = -SCROLL_SPEED * scrollAcceleration * (1 - distanceFromTop / SCROLL_THRESHOLD);
+                        scrollAcceleration = Math.min(scrollAcceleration * SCROLL_ACCELERATION, 3);
                     } else if (distanceFromBottom < SCROLL_THRESHOLD) {
-                        // Scroll down
-                        scrollDelta = SCROLL_SPEED * (1 - distanceFromBottom / SCROLL_THRESHOLD);
+                        // Scroll down with acceleration
+                        scrollDelta = SCROLL_SPEED * scrollAcceleration * (1 - distanceFromBottom / SCROLL_THRESHOLD);
+                        scrollAcceleration = Math.min(scrollAcceleration * SCROLL_ACCELERATION, 3);
+                    } else {
+                        // Reset acceleration when not at edges
+                        scrollAcceleration = 1;
                     }
                     
                     if (scrollDelta !== 0) {
-                        window.scrollBy(0, scrollDelta);
+                        // Smooth scroll with easing
+                        const smoothScroll = scrollDelta * (timeSinceLastScroll / SCROLL_INTERVAL);
+                        window.scrollBy(0, smoothScroll);
+                        
                         // Update ghost position to account for scroll
                         if (ghostElement) {
                             const currentTop = parseInt(ghostElement.style.top);
-                            ghostElement.style.top = `${currentTop + scrollDelta}px`;
+                            ghostElement.style.top = `${currentTop + smoothScroll}px`;
                         }
+                        
+                        lastScrollTime = currentTime;
                     }
                 }, SCROLL_INTERVAL);
             }
@@ -617,6 +633,7 @@ const Tasks = (() => {
                 if (autoScrollInterval) {
                     clearInterval(autoScrollInterval);
                     autoScrollInterval = null;
+                    scrollAcceleration = 1;
                 }
             }
 

@@ -69,6 +69,31 @@ const Translations = (() => {
             task_deleted: "Tarea eliminada",
             review_saved: "Revisión guardada",
             new_week_started: "Nueva semana iniciada"
+        },
+
+        // Feedback translations
+        feedback_title: "Enviar Feedback",
+        feedback_placeholder: "Escribe aquí tus sugerencias, mejoras o reporta algún error...",
+        feedback_empty: "Por favor, escribe tu feedback antes de enviar.",
+        feedback_sent: "¡Gracias por tu feedback! 💝 Tu opinión es valiosa para mejorar Habitus.",
+        cancel: "Cancelar",
+        send: "Enviar",
+
+        es: {
+            feedback_title: "Enviar Feedback",
+            feedback_placeholder: "Escribe aquí tus sugerencias, mejoras o reporta algún error...",
+            feedback_empty: "Por favor, escribe tu feedback antes de enviar.",
+            feedback_sent: "¡Gracias por tu feedback! 💝 Tu opinión es valiosa para mejorar Habitus.",
+            cancel: "Cancelar",
+            send: "Enviar"
+        },
+        en: {
+            feedback_title: "Send Feedback",
+            feedback_placeholder: "Write your suggestions, improvements or report any issues here...",
+            feedback_empty: "Please write your feedback before sending.",
+            feedback_sent: "Thank you for your feedback! 💝 Your input is valuable to improve Habitus.",
+            cancel: "Cancel",
+            send: "Send"
         }
     };
 
