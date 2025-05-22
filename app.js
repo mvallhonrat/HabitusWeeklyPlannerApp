@@ -266,23 +266,50 @@ const App = (() => {
             
             // Get current date and time
             const now = new Date();
+            
+            // Format date components
+            const day = now.getDate().toString().padStart(2, '0');
+            const month = (now.getMonth() + 1).toString().padStart(2, '0'); // +1 because months are 0-based
+            const year = now.getFullYear();
             const hours = now.getHours().toString().padStart(2, '0');
             const minutes = now.getMinutes().toString().padStart(2, '0');
+            
+            // Log the data being sent
+            console.log('Submitting feedback to Google Form:', {
+                text: feedback.text,
+                language: feedback.language,
+                version: feedback.version,
+                userAgent: feedback.userAgent,
+                date: { day, month, year },
+                time: { hours, minutes }
+            });
             
             // Map feedback to form fields using provided entry IDs
             formData.append('entry.139403842', feedback.text); // Feedback text
             formData.append('entry.1727937598', feedback.language); // Language
-            formData.append('entry.9141795', feedback.version); // Version
+            formData.append('entry.91491795', feedback.version); // Version
             formData.append('entry.1975576551', feedback.userAgent); // User Agent
+            
+            // Date components
+            formData.append('entry.1060868168_day', day); // Day
+            formData.append('entry.1060868168_month', month); // Month
+            formData.append('entry.1060868168_year', year); // Year
+            
+            // Time components
             formData.append('entry.1060868168_hour', hours); // Hour
             formData.append('entry.1060868168_minute', minutes); // Minute
 
             // Submit to the Google Form with the complete URL
+            console.log('Attempting to submit to Google Form...');
             const response = await fetch('https://docs.google.com/forms/d/e/1FAIpQLSfvesAJ3czHCvXQTAWoaE2sEg48sh-uTrz6EejQHbm2e7FePg/formResponse', {
                 method: 'POST',
                 mode: 'no-cors', // Required for Google Forms
                 body: formData
             });
+
+            console.log('Form submission response:', response);
+            console.log('Response status:', response.status);
+            console.log('Response type:', response.type);
 
             // Clear and hide modal
             textarea.value = '';
@@ -292,6 +319,12 @@ const App = (() => {
             showNotification(Translations.getTranslation('feedback_sent'), 'success');
         } catch (error) {
             console.error('Error submitting feedback:', error);
+            // Log more details about the error
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
             // Even if Google Form submission fails, we still have the data in localStorage
             showNotification(Translations.getTranslation('feedback_sent') + ' (offline)', 'success');
         }
