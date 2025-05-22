@@ -825,3 +825,126 @@ window.Tasks = Tasks;
 
 // Remove any automatic initialization
 // The initialization will be handled by the main initApp function 
+
+function renderTask(task, index) {
+    return `
+        <div class="task-item bg-white rounded shadow-sm flex items-center" 
+             data-task-id="${task.id}" 
+             data-role="${task.role}" 
+             data-quadrant="${task.quadrant}">
+            <div class="drag-handle">⋮⋮</div>
+            <div class="task-content flex-1 flex items-center">
+                <input type="checkbox" 
+                       class="mr-2" 
+                       ${task.completed ? 'checked' : ''} 
+                       onchange="Tasks.toggleTaskComplete('${task.id}')">
+                <span class="flex-1 ${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</span>
+                <button class="text-red-500 hover:text-red-700 ml-2" 
+                        onclick="Tasks.deleteTask('${task.id}')">×</button>
+            </div>
+        </div>
+    `;
+}
+
+// Update drag and drop handling
+function setupDragAndDrop() {
+    let draggedTask = null;
+    let dragStartY = 0;
+    let initialScrollY = 0;
+
+    function handleTouchStart(e) {
+        const taskElement = e.target.closest('.task-item');
+        if (!taskElement) return;
+
+        const handle = e.target.closest('.drag-handle');
+        if (!handle && !taskElement.classList.contains('long-press')) {
+            // Only start drag from handle or after long press
+            return;
+        }
+
+        // Store initial scroll position
+        initialScrollY = window.scrollY;
+        dragStartY = e.touches[0].clientY;
+
+        // Prevent default only if starting drag
+        e.preventDefault();
+        startDrag(e, taskElement);
+    }
+
+    function handleTouchMove(e) {
+        if (!draggedTask) return;
+
+        e.preventDefault(); // Prevent scrolling while dragging
+
+        const touch = e.touches[0];
+        const ghost = document.querySelector('.task-ghost');
+        if (!ghost) return;
+
+        // Calculate position considering scroll
+        const scrollY = window.scrollY;
+        const deltaY = touch.clientY - dragStartY;
+        const newY = touch.clientY + scrollY - initialScrollY;
+
+        // Update ghost position
+        ghost.style.transform = `translate(${touch.clientX - ghost.offsetWidth / 2}px, ${newY - ghost.offsetHeight / 2}px)`;
+
+        // Find drop target
+        const dropTarget = findDropTarget(touch.clientX, newY);
+        updateDropTarget(dropTarget);
+    }
+
+    function handleTouchEnd(e) {
+        if (!draggedTask) return;
+
+        const touch = e.changedTouches[0];
+        const dropTarget = findDropTarget(touch.clientX, touch.clientY + window.scrollY - initialScrollY);
+        
+        if (dropTarget) {
+            handleDrop(draggedTask, dropTarget);
+        }
+
+        cleanupDrag();
+    }
+
+    function startDrag(e, taskElement) {
+        draggedTask = taskElement;
+        taskElement.classList.add('dragging');
+        document.body.classList.add('dragging-active');
+
+        // Create ghost element
+        const ghost = taskElement.cloneNode(true);
+        ghost.classList.add('task-ghost');
+        document.body.appendChild(ghost);
+
+        // Set initial position
+        const rect = taskElement.getBoundingClientRect();
+        ghost.style.width = `${rect.width}px`;
+        ghost.style.height = `${rect.height}px`;
+
+        // Add touch event listeners
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd);
+        document.addEventListener('touchcancel', cleanupDrag);
+    }
+
+    function cleanupDrag() {
+        if (!draggedTask) return;
+
+        draggedTask.classList.remove('dragging');
+        document.body.classList.remove('dragging-active');
+        
+        const ghost = document.querySelector('.task-ghost');
+        if (ghost) ghost.remove();
+
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+        document.removeEventListener('touchcancel', cleanupDrag);
+
+        draggedTask = null;
+    }
+
+    // Add touch event listeners to task items
+    document.querySelectorAll('.task-item').forEach(taskElement => {
+        taskElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+    });
+} 
