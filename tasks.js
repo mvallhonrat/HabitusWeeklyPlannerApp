@@ -228,49 +228,54 @@ const Tasks = (() => {
     function migrateMetricsData() {
         if (!metrics || !Array.isArray(metrics)) return;
         
-        console.log('Original metrics:', metrics); // Debug log
+        console.log('Original metrics before migration:', metrics);
         
         let needsMigration = false;
         const migratedMetrics = metrics.map(metric => {
-            let newTimestamp;
-            
-            // Debug log for each metric
-            console.log('Processing metric:', metric);
-            console.log('Timestamp type:', typeof metric.timestamp);
-            console.log('Timestamp value:', metric.timestamp);
-            
-            if (metric.timestamp === undefined || metric.timestamp === null) {
+            // Check if this is old format data (from version 1.0.0)
+            const isOldFormat = metric.hasOwnProperty('porcentaje') || 
+                              metric.hasOwnProperty('q1') || 
+                              metric.hasOwnProperty('fecha');
+
+            if (isOldFormat) {
                 needsMigration = true;
-                newTimestamp = Date.now();
+                console.log('Found old format metric:', metric);
+                
+                // Convert old format to new format
+                const newMetric = {
+                    timestamp: metric.fecha ? new Date(metric.fecha).getTime() : Date.now(),
+                    totalTasks: (metric.completadas || 0) + (metric.pendientes || 0),
+                    completedTasks: metric.completadas || 0,
+                    activeRoles: metric.roles || 0,
+                    quadrants: [
+                        parseInt(metric.q1) || 0,
+                        parseInt(metric.q2) || 0,
+                        parseInt(metric.q3) || 0,
+                        parseInt(metric.q4) || 0
+                    ],
+                    review: metric.revision || ''
+                };
+                console.log('Converted to new format:', newMetric);
+                return newMetric;
+            }
+
+            // Handle timestamp conversion for already migrated data
+            let newTimestamp;
+            if (metric.timestamp instanceof Date) {
+                needsMigration = true;
+                newTimestamp = metric.timestamp.getTime();
             } else if (typeof metric.timestamp === 'string') {
-                // Try parsing the string date
+                needsMigration = true;
                 const parsedDate = new Date(metric.timestamp);
-                if (isNaN(parsedDate.getTime())) {
-                    // If it's not a valid date string, try parsing as a number
-                    const numTimestamp = parseInt(metric.timestamp);
-                    if (!isNaN(numTimestamp)) {
-                        needsMigration = true;
-                        newTimestamp = numTimestamp < 1000000000000 ? numTimestamp * 1000 : numTimestamp;
-                    } else {
-                        // If all parsing fails, use current time
-                        needsMigration = true;
-                        newTimestamp = Date.now();
-                    }
-                } else {
-                    needsMigration = true;
-                    newTimestamp = parsedDate.getTime();
-                }
+                newTimestamp = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
             } else if (typeof metric.timestamp === 'number') {
                 needsMigration = true;
                 newTimestamp = metric.timestamp < 1000000000000 ? metric.timestamp * 1000 : metric.timestamp;
             } else {
-                // Fallback to current time for any other case
-                needsMigration = true;
-                newTimestamp = Date.now();
+                // Keep existing data if it's already in new format
+                return metric;
             }
-            
-            console.log('New timestamp:', newTimestamp); // Debug log
-            
+
             return {
                 ...metric,
                 timestamp: newTimestamp
@@ -278,7 +283,7 @@ const Tasks = (() => {
         });
 
         if (needsMigration) {
-            console.log('Migrated metrics:', migratedMetrics); // Debug log
+            console.log('Migrated metrics:', migratedMetrics);
             metrics = migratedMetrics;
             saveData();
             App.showNotification(Translations.getTranslation('notifications.data_migrated'), 'success');
@@ -947,7 +952,7 @@ const Tasks = (() => {
         // Ensure metrics are migrated
         migrateMetricsData();
         
-        console.log('Preparing historical data with metrics:', metrics); // Debug log
+        console.log('Preparing historical data with metrics:', metrics);
         
         const labels = metrics.map(m => {
             try {
@@ -973,30 +978,48 @@ const Tasks = (() => {
             }
         });
         
-        console.log('Generated labels:', labels); // Debug log
+        console.log('Generated labels:', labels);
         
-        const completionPercentages = metrics.map(m => 
-            m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0
-        );
+        // Handle both old and new format for completion percentages
+        const completionPercentages = metrics.map(m => {
+            if (m.hasOwnProperty('porcentaje')) {
+                // Old format
+                return parseInt(m.porcentaje.replace('%', '')) || 0;
+            } else {
+                // New format
+                return m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0;
+            }
+        });
         
         // Safely get quadrant counts with fallback to zeros
         const getQuadrantCounts = (m) => {
-            if (!m.quadrants || !Array.isArray(m.quadrants)) {
-                return [0, 0, 0, 0];
+            if (m.hasOwnProperty('q1')) {
+                // Old format
+                return [
+                    parseInt(m.q1) || 0,
+                    parseInt(m.q2) || 0,
+                    parseInt(m.q3) || 0,
+                    parseInt(m.q4) || 0
+                ];
+            } else if (m.quadrants && Array.isArray(m.quadrants)) {
+                // New format
+                return [
+                    m.quadrants[0] || 0,
+                    m.quadrants[1] || 0,
+                    m.quadrants[2] || 0,
+                    m.quadrants[3] || 0
+                ];
             }
-            return [
-                m.quadrants[0] || 0,
-                m.quadrants[1] || 0,
-                m.quadrants[2] || 0,
-                m.quadrants[3] || 0
-            ];
+            return [0, 0, 0, 0];
         };
 
         const q1Counts = metrics.map(m => getQuadrantCounts(m)[0]);
         const q2Counts = metrics.map(m => getQuadrantCounts(m)[1]);
         const q3Counts = metrics.map(m => getQuadrantCounts(m)[2]);
         const q4Counts = metrics.map(m => getQuadrantCounts(m)[3]);
-        const activeRoles = metrics.map(m => m.activeRoles || 0);
+        
+        // Handle both old and new format for active roles
+        const activeRoles = metrics.map(m => m.hasOwnProperty('roles') ? m.roles : (m.activeRoles || 0));
 
         return {
             labels,
