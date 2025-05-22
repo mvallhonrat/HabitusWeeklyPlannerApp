@@ -31,6 +31,11 @@ const Tasks = (() => {
         tabQuadrants: null
     };
 
+    // Add these variables at the top of your file
+    let longPressTimer = null;
+    let isLongPress = false;
+    const LONG_PRESS_DURATION = 500; // 500ms for long press
+
     // Initialize tasks module
     function init() {
         // Destroy existing charts before reinitializing
@@ -399,7 +404,7 @@ const Tasks = (() => {
                 <div class="space-y-2 min-h-[50px] p-2 rounded transition-colors" id="role-${role}">
                     ${roleTasks.length === 0 ? 
                         `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
-                        roleTasks.map(task => createTaskElement(task)).join('')
+                        roleTasks.map((task, index) => renderTask(task, index)).join('')
                     }
                 </div>
             `;
@@ -423,7 +428,7 @@ const Tasks = (() => {
                 <div class="space-y-2 min-h-[50px] p-2 rounded transition-colors" id="quadrant-${quadrant}">
                     ${quadrantTasks.length === 0 ? 
                         `<p class="text-sm text-gray-500">${Translations.getTranslation('no_tasks')}</p>` :
-                        quadrantTasks.map(task => createTaskElement(task)).join('')
+                        quadrantTasks.map((task, index) => renderTask(task, index)).join('')
                     }
                 </div>
             `;
@@ -431,282 +436,39 @@ const Tasks = (() => {
         }
     }
 
-    // Create task element
-    function createTaskElement(task) {
-        const quadrantColors = {
-            '1': 'bg-red-50 border-red-200',
-            '2': 'bg-green-50 border-green-200',
-            '3': 'bg-yellow-50 border-yellow-200',
-            '4': 'bg-gray-50 border-gray-200'
-        };
-
-        const quadrantTextColors = {
-            '1': 'text-red-700',
-            '2': 'text-green-700',
-            '3': 'text-yellow-700',
-            '4': 'text-gray-700'
-        };
-
-        const quadrantBorderColors = {
-            '1': 'border-l-4 border-red-500',
-            '2': 'border-l-4 border-green-500',
-            '3': 'border-l-4 border-yellow-500',
-            '4': 'border-l-4 border-gray-500'
-        };
-
-        const quadrantLabels = {
-            '1': 'QI',
-            '2': 'QII',
-            '3': 'QIII',
-            '4': 'QIV'
-        };
-
-        return `
-            <div class="task-item flex items-center justify-between ${quadrantColors[task.quadrant]} ${quadrantBorderColors[task.quadrant]} p-3 rounded shadow-sm mb-2" 
-                 draggable="true" 
-                 data-task-id="${task.id}"
-                 data-role="${task.role}"
-                 data-quadrant="${task.quadrant}">
-                <div class="flex items-center space-x-3 flex-1">
-                    <span class="drag-handle cursor-move text-gray-400 hover:text-gray-600">⋮⋮</span>
-                    <input type="checkbox" 
-                           class="form-checkbox h-4 w-4 text-indigo-600" 
-                           ${task.completed ? 'checked' : ''} 
-                           onchange="Tasks.toggleTaskComplete('${task.id}')">
-                    <span class="text-sm ${task.completed ? 'line-through text-gray-500' : quadrantTextColors[task.quadrant]}">${task.description}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-xs px-2 py-1 rounded-full ${quadrantColors[task.quadrant]} ${quadrantTextColors[task.quadrant]}">${quadrantLabels[task.quadrant]}</span>
-                    <button onclick="Tasks.deleteTask('${task.id}')" class="text-red-500 hover:text-red-700">
-                        🗑️
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    // Set up drag and drop
-    function setupDragAndDrop() {
-        const taskElements = document.querySelectorAll('.task-item');
-        const dropZones = document.querySelectorAll('[id^="role-"], [id^="quadrant-"]');
+    // Update your existing drag functions to work with the new system
+    function startDrag(e, taskElement) {
+        if (taskElement.classList.contains('dragging')) return;
         
-        // Remove existing listeners
-        taskElements.forEach(el => {
-            el.removeEventListener('dragstart', handleDragStart);
-            el.removeEventListener('dragend', handleDragEnd);
-            el.removeEventListener('touchstart', handleTouchStart);
-            el.removeEventListener('touchmove', handleTouchMove);
-            el.removeEventListener('touchend', handleTouchEnd);
-            el.removeEventListener('touchcancel', handleTouchEnd);
-        });
-        
-        dropZones.forEach(zone => {
-            zone.removeEventListener('dragover', handleDragOver);
-            zone.removeEventListener('dragleave', handleDragLeave);
-            zone.removeEventListener('drop', handleDrop);
-        });
-        
-        // Add new listeners
-        taskElements.forEach(taskElement => {
-            // Mouse events
-            taskElement.setAttribute('draggable', 'true');
-            taskElement.addEventListener('dragstart', handleDragStart);
-            taskElement.addEventListener('dragend', handleDragEnd);
-            
-            // Touch events with passive: false to prevent scrolling
-            taskElement.addEventListener('touchstart', handleTouchStart, { passive: false });
-            taskElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-            taskElement.addEventListener('touchend', handleTouchEnd, { passive: false });
-            taskElement.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-        });
-
-        dropZones.forEach(zone => {
-            zone.addEventListener('dragover', handleDragOver);
-            zone.addEventListener('dragleave', handleDragLeave);
-            zone.addEventListener('drop', handleDrop);
-        });
-    }
-
-    // Handle touch start
-    function handleTouchStart(e) {
-        if (e.touches.length !== 1) return;
-        
-        const taskElement = e.target.closest('.task-item');
-        if (!taskElement) return;
-        
-        e.preventDefault(); // Prevent scrolling
-        
-        const touch = e.touches[0];
-        const rect = taskElement.getBoundingClientRect();
+        taskElement.classList.add('dragging');
+        document.body.classList.add('dragging-active');
         
         // Create ghost element
         const ghost = taskElement.cloneNode(true);
         ghost.classList.add('task-ghost');
-        ghost.style.position = 'fixed';
+        document.body.appendChild(ghost);
+        
+        // Set initial position
+        const rect = taskElement.getBoundingClientRect();
         ghost.style.width = `${rect.width}px`;
         ghost.style.height = `${rect.height}px`;
-        ghost.style.zIndex = '1000';
-        ghost.style.opacity = '0.8';
-        ghost.style.pointerEvents = 'none';
-        ghost.style.transform = 'translate(-50%, -50%)';
         
-        // Store data for drag
-        taskElement.dataset.dragX = touch.clientX - rect.left;
-        taskElement.dataset.dragY = touch.clientY - rect.top;
-        taskElement.dataset.ghost = ghost;
-        taskElement.classList.add('dragging');
+        // Store initial touch/mouse position
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         
-        // Add ghost to body
-        document.body.appendChild(ghost);
-        updateGhostPosition(touch.clientX, touch.clientY, ghost);
+        taskElement.dataset.dragX = clientX - rect.left;
+        taskElement.dataset.dragY = clientY - rect.top;
         
-        // Add dragging class to body
-        document.body.classList.add('dragging-active');
+        // Add move and end listeners
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('touchmove', handleDrag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
     }
 
-    // Handle touch move
-    function handleTouchMove(e) {
-        if (e.touches.length !== 1) return;
-        
-        const taskElement = document.querySelector('.task-item.dragging');
-        if (!taskElement) return;
-        
-        e.preventDefault(); // Prevent scrolling
-        
-        const touch = e.touches[0];
-        const ghost = taskElement.dataset.ghost;
-        
-        if (ghost) {
-            updateGhostPosition(touch.clientX, touch.clientY, ghost);
-            
-            // Find drop target
-            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('[id^="role-"], [id^="quadrant-"]');
-            if (dropTarget) {
-                // Remove drag-over class from all drop zones
-                document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
-                    el.classList.remove('drag-over');
-                });
-                dropTarget.classList.add('drag-over');
-            }
-        }
-    }
-
-    // Handle touch end
-    function handleTouchEnd(e) {
-        const taskElement = document.querySelector('.task-item.dragging');
-        if (!taskElement) return;
-        
-        e.preventDefault();
-        
-        // Remove ghost
-        const ghost = taskElement.dataset.ghost;
-        if (ghost && ghost.parentNode) {
-            ghost.parentNode.removeChild(ghost);
-        }
-        
-        // Remove dragging classes
-        taskElement.classList.remove('dragging');
-        document.body.classList.remove('dragging-active');
-        document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
-            el.classList.remove('drag-over');
-        });
-        
-        // Find drop target
-        const touch = e.changedTouches[0];
-        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('[id^="role-"], [id^="quadrant-"]');
-        
-        if (dropTarget) {
-            const taskId = taskElement.dataset.taskId;
-            const task = tasks.find(t => t.id === taskId);
-            
-            if (task) {
-                if (dropTarget.id.startsWith('role-')) {
-                    const newRole = dropTarget.id.replace('role-', '');
-                    task.role = newRole;
-                } else if (dropTarget.id.startsWith('quadrant-')) {
-                    const newQuadrant = dropTarget.id.replace('quadrant-', '');
-                    task.quadrant = newQuadrant;
-                }
-                
-                saveData();
-                updateUI();
-            }
-        }
-        
-        // Clean up
-        delete taskElement.dataset.dragX;
-        delete taskElement.dataset.dragY;
-        delete taskElement.dataset.ghost;
-    }
-
-    // Handle drop
-    function handleDrop(e) {
-        e.preventDefault();
-        const taskId = e.dataTransfer.getData('text/plain');
-        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
-        
-        if (dropZone && taskId) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                if (dropZone.id.startsWith('role-')) {
-                    const newRole = dropZone.id.replace('role-', '');
-                    task.role = newRole;
-                } else if (dropZone.id.startsWith('quadrant-')) {
-                    const newQuadrant = dropZone.id.replace('quadrant-', '');
-                    task.quadrant = newQuadrant;
-                }
-                
-                saveData();
-                updateUI();
-            }
-        }
-        
-        document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
-            el.classList.remove('drag-over');
-        });
-    }
-
-    // Update ghost position
-    function updateGhostPosition(x, y, ghost) {
-        if (!ghost) return;
-        
-        const dragX = parseFloat(ghost.parentElement?.querySelector('.task-item.dragging')?.dataset.dragX || 0);
-        const dragY = parseFloat(ghost.parentElement?.querySelector('.task-item.dragging')?.dataset.dragY || 0);
-        
-        ghost.style.left = `${x - dragX}px`;
-        ghost.style.top = `${y - dragY}px`;
-    }
-
-    // Handle drag start
-    function handleDragStart(e) {
-        e.target.classList.add('opacity-50', 'dragging');
-        e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
-        e.dataTransfer.effectAllowed = 'move';
-    }
-
-    // Handle drag end
-    function handleDragEnd(e) {
-        e.target.classList.remove('opacity-50', 'dragging');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    }
-
-    // Handle drag over
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
-        if (dropZone) {
-            dropZone.classList.add('drag-over', 'bg-gray-100');
-        }
-    }
-
-    // Handle drag leave
-    function handleDragLeave(e) {
-        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
-        if (dropZone) {
-            dropZone.classList.remove('drag-over', 'bg-gray-100');
-        }
-    }
+    // Rest of your existing drag and drop code...
+    // ... existing code ...
 
     // Add a new task
     function addTask() {

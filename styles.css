@@ -1,9 +1,10 @@
 /* Drag and Drop Styles */
 .task-item {
-    touch-action: none;
+    touch-action: pan-y pinch-zoom; /* Allow normal touch interactions by default */
     user-select: none;
     transition: transform 0.2s ease, opacity 0.2s ease;
     -webkit-tap-highlight-color: transparent;
+    position: relative; /* For drag handle positioning */
 }
 
 .task-item:hover {
@@ -21,10 +22,23 @@
     user-select: none;
     color: #6B7280;
     transition: opacity 0.2s ease, color 0.2s ease;
+    padding: 12px;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
 }
 
-.drag-handle:hover {
-    color: #374151;
+/* Show drag handle on hover/active */
+@media (hover: hover) {
+    .task-item:hover .drag-handle {
+        opacity: 1;
+    }
 }
 
 .dark .drag-handle {
@@ -80,18 +94,22 @@
     user-select: none;
 }
 
-/* Improve touch interaction */
+/* Mobile-specific styles */
 @media (hover: none) {
-    .drag-handle {
-        opacity: 1 !important;
-        padding: 12px; /* Larger touch target for drag handle */
-    }
-    
-    .task-item:active {
-        transform: scale(0.98);
+    .task-item {
+        padding-left: 48px; /* Make room for drag handle */
     }
 
-    /* Prevent accidental scrolling while dragging */
+    .drag-handle {
+        opacity: 0.7; /* Always visible on mobile */
+    }
+
+    /* Prevent accidental drags */
+    .task-item:not(.dragging) {
+        touch-action: pan-y pinch-zoom;
+    }
+
+    /* Only allow drag from handle or after long press */
     .task-item.dragging {
         touch-action: none;
         -webkit-touch-callout: none;
@@ -99,13 +117,10 @@
         user-select: none;
     }
 
-    /* Improve touch feedback */
-    .task-item {
-        touch-action: pan-y pinch-zoom; /* Allow vertical scrolling when not dragging */
-    }
-
-    .task-item.dragging {
-        touch-action: none; /* Disable all touch actions while dragging */
+    /* Visual feedback for long press */
+    .task-item.long-press {
+        transform: scale(0.98);
+        opacity: 0.8;
     }
 }
 
