@@ -392,11 +392,24 @@ async function migrateData() {
                 const tasks = JSON.parse(oldTasks);
                 if (Array.isArray(tasks)) {
                     // Update task format if needed
-                    const updatedTasks = tasks.map(task => ({
-                        ...task,
-                        id: task.id || Date.now().toString(),
-                        createdAt: task.createdAt || new Date().toISOString()
-                    }));
+                    const updatedTasks = tasks.map(task => {
+                        // Log the task for debugging
+                        console.log('Migrating task:', task);
+                        
+                        // Ensure all required fields are present
+                        return {
+                            id: task.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            description: task.description || task.text || task.name || 'Task without description',
+                            role: task.role || 'Unassigned',
+                            quadrant: task.quadrant || '1',
+                            completed: !!task.completed,
+                            createdAt: task.createdAt || new Date().toISOString()
+                        };
+                    });
+                    
+                    // Log the updated tasks for debugging
+                    console.log('Updated tasks:', updatedTasks);
+                    
                     localStorage.setItem('habitus_tasks', JSON.stringify(updatedTasks));
                     localStorage.removeItem('tasks');
                     migrationLog.push('Tasks migrated successfully');
@@ -427,7 +440,20 @@ async function migrateData() {
             try {
                 const tasksLog = JSON.parse(oldTasksLog);
                 if (Array.isArray(tasksLog)) {
-                    localStorage.setItem('habitus_tasksLog', JSON.stringify(tasksLog));
+                    // Update task log format if needed
+                    const updatedTasksLog = tasksLog.map(log => ({
+                        timestamp: log.timestamp || Date.now(),
+                        tasks: (log.tasks || []).map(task => ({
+                            id: task.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            description: task.description || task.text || task.name || 'Task without description',
+                            role: task.role || 'Unassigned',
+                            quadrant: task.quadrant || '1',
+                            completed: !!task.completed,
+                            createdAt: task.createdAt || new Date().toISOString()
+                        }))
+                    }));
+                    
+                    localStorage.setItem('habitus_tasksLog', JSON.stringify(updatedTasksLog));
                     localStorage.removeItem('tasksLog');
                     migrationLog.push('Task log migrated successfully');
                 }
