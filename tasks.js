@@ -36,6 +36,12 @@ const Tasks = (() => {
     let isLongPress = false;
     const LONG_PRESS_DURATION = 500; // 500ms for long press
 
+    // Add these variables at the top of the Tasks module
+    let draggedTask = null;
+    let dragStartY = 0;
+    let initialScrollY = 0;
+    let isDragging = false;
+
     // Initialize tasks module
     function init() {
         // Destroy existing charts before reinitializing
@@ -438,37 +444,136 @@ const Tasks = (() => {
 
     // Update your existing drag functions to work with the new system
     function startDrag(e, taskElement) {
-        if (taskElement.classList.contains('dragging')) return;
+        // Prevent default only for drag handle
+        if (e.target.classList.contains('drag-handle')) {
+            e.preventDefault();
+        } else {
+            return; // Only allow drag from handle
+        }
+
+        draggedTask = taskElement;
+        isDragging = true;
         
+        // Store initial positions
+        initialScrollY = window.scrollY;
+        dragStartY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+        
+        // Add dragging class
         taskElement.classList.add('dragging');
         document.body.classList.add('dragging-active');
         
         // Create ghost element
         const ghost = taskElement.cloneNode(true);
         ghost.classList.add('task-ghost');
+        ghost.style.position = 'fixed';
+        ghost.style.width = `${taskElement.offsetWidth}px`;
+        ghost.style.height = `${taskElement.offsetHeight}px`;
         document.body.appendChild(ghost);
         
-        // Set initial position
-        const rect = taskElement.getBoundingClientRect();
-        ghost.style.width = `${rect.width}px`;
-        ghost.style.height = `${rect.height}px`;
-        
-        // Store initial touch/mouse position
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        
-        taskElement.dataset.dragX = clientX - rect.left;
-        taskElement.dataset.dragY = clientY - rect.top;
-        
-        // Add move and end listeners
-        document.addEventListener('mousemove', handleDrag);
-        document.addEventListener('touchmove', handleDrag, { passive: false });
-        document.addEventListener('mouseup', endDrag);
-        document.addEventListener('touchend', endDrag);
+        // Add event listeners
+        if (e.type === 'touchstart') {
+            document.addEventListener('touchmove', handleDragMove, { passive: false });
+            document.addEventListener('touchend', handleDragEnd);
+            document.addEventListener('touchcancel', handleDragEnd);
+        } else {
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+        }
     }
 
-    // Rest of your existing drag and drop code...
-    // ... existing code ...
+    function handleDragMove(e) {
+        if (!isDragging || !draggedTask) return;
+        
+        e.preventDefault();
+        
+        const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+        const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+        
+        // Calculate new position
+        const scrollY = window.scrollY;
+        const newY = clientY + scrollY - initialScrollY;
+        
+        // Update ghost position
+        const ghost = document.querySelector('.task-ghost');
+        if (ghost) {
+            ghost.style.transform = `translate(${clientX - ghost.offsetWidth / 2}px, ${newY - ghost.offsetHeight / 2}px)`;
+        }
+        
+        // Find and update drop target
+        const dropTarget = findDropTarget(clientX, newY);
+        updateDropTarget(dropTarget);
+    }
+
+    function handleDragEnd(e) {
+        if (!isDragging || !draggedTask) return;
+        
+        const clientY = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
+        const clientX = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
+        
+        // Find final drop target
+        const dropTarget = findDropTarget(clientX, clientY + window.scrollY - initialScrollY);
+        if (dropTarget) {
+            handleDrop(draggedTask, dropTarget);
+        }
+        
+        // Cleanup
+        cleanupDrag();
+    }
+
+    function cleanupDrag() {
+        if (!draggedTask) return;
+        
+        draggedTask.classList.remove('dragging');
+        document.body.classList.remove('dragging-active');
+        
+        const ghost = document.querySelector('.task-ghost');
+        if (ghost) ghost.remove();
+        
+        // Remove event listeners
+        document.removeEventListener('touchmove', handleDragMove);
+        document.removeEventListener('touchend', handleDragEnd);
+        document.removeEventListener('touchcancel', handleDragEnd);
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        
+        draggedTask = null;
+        isDragging = false;
+    }
+
+    function findDropTarget(x, y) {
+        const elements = document.elementsFromPoint(x, y);
+        return elements.find(el => el.classList.contains('task-list'));
+    }
+
+    function updateDropTarget(target) {
+        // Remove highlight from all targets
+        document.querySelectorAll('.task-list').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+        
+        // Add highlight to current target
+        if (target) {
+            target.classList.add('drag-over');
+        }
+    }
+
+    function handleDrop(taskElement, dropTarget) {
+        const taskId = taskElement.dataset.taskId;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+        
+        // Get new role/quadrant from drop target
+        const targetId = dropTarget.id;
+        if (targetId.startsWith('role-')) {
+            task.role = targetId.replace('role-', '');
+        } else if (targetId.startsWith('quadrant-')) {
+            task.quadrant = targetId.replace('quadrant-', '');
+        }
+        
+        // Save and update UI
+        saveData();
+        updateUI();
+    }
 
     // Add a new task
     function addTask() {
@@ -816,7 +921,11 @@ const Tasks = (() => {
         exportTasks,
         showRoles,
         showQuadrants,
-        destroyCharts
+        destroyCharts,
+        startDrag,
+        handleDragMove,
+        handleDragEnd,
+        cleanupDrag
     };
 })();
 
@@ -832,7 +941,7 @@ function renderTask(task, index) {
              data-task-id="${task.id}" 
              data-role="${task.role}" 
              data-quadrant="${task.quadrant}">
-            <div class="drag-handle">⋮⋮</div>
+            <div class="drag-handle" onmousedown="Tasks.startDrag(event, this.parentElement)" ontouchstart="Tasks.startDrag(event, this.parentElement)">⋮⋮</div>
             <div class="task-content flex-1 flex items-center">
                 <input type="checkbox" 
                        class="mr-2" 
