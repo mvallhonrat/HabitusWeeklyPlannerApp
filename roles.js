@@ -159,7 +159,10 @@ const Roles = (() => {
     };
 })();
 
-// Initialize roles when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    Roles.init();
-}); 
+// Make Roles available globally
+window.Roles = Roles;
+
+// Remove automatic initialization
+// document.addEventListener('DOMContentLoaded', () => {
+//     Roles.init();
+// }); 

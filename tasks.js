@@ -33,6 +33,9 @@ const Tasks = (() => {
 
     // Initialize tasks module
     function init() {
+        // Destroy existing charts before reinitializing
+        destroyCharts();
+
         // Cache DOM elements
         elements.taskInput = document.getElementById('taskInput');
         elements.roleSelect = document.getElementById('roleSelect');
@@ -59,6 +62,30 @@ const Tasks = (() => {
 
         // Show roles view by default
         showRoles();
+    }
+
+    // Destroy existing charts
+    function destroyCharts() {
+        if (chartQuadrants) {
+            chartQuadrants.destroy();
+            chartQuadrants = null;
+        }
+        if (chartCompletion) {
+            chartCompletion.destroy();
+            chartCompletion = null;
+        }
+        if (chartHistoricalCompletion) {
+            chartHistoricalCompletion.destroy();
+            chartHistoricalCompletion = null;
+        }
+        if (chartHistoricalQuadrants) {
+            chartHistoricalQuadrants.destroy();
+            chartHistoricalQuadrants = null;
+        }
+        if (chartHistoricalRoles) {
+            chartHistoricalRoles.destroy();
+            chartHistoricalRoles = null;
+        }
     }
 
     // Set up event listeners
@@ -461,22 +488,38 @@ const Tasks = (() => {
     // Set up drag and drop
     function setupDragAndDrop() {
         const taskElements = document.querySelectorAll('.task-item');
+        const dropZones = document.querySelectorAll('[id^="role-"], [id^="quadrant-"]');
         
+        // Remove existing listeners
+        taskElements.forEach(el => {
+            el.removeEventListener('dragstart', handleDragStart);
+            el.removeEventListener('dragend', handleDragEnd);
+            el.removeEventListener('touchstart', handleTouchStart);
+            el.removeEventListener('touchmove', handleTouchMove);
+            el.removeEventListener('touchend', handleTouchEnd);
+            el.removeEventListener('touchcancel', handleTouchEnd);
+        });
+        
+        dropZones.forEach(zone => {
+            zone.removeEventListener('dragover', handleDragOver);
+            zone.removeEventListener('dragleave', handleDragLeave);
+            zone.removeEventListener('drop', handleDrop);
+        });
+        
+        // Add new listeners
         taskElements.forEach(taskElement => {
             // Mouse events
             taskElement.setAttribute('draggable', 'true');
             taskElement.addEventListener('dragstart', handleDragStart);
             taskElement.addEventListener('dragend', handleDragEnd);
             
-            // Touch events
+            // Touch events with passive: false to prevent scrolling
             taskElement.addEventListener('touchstart', handleTouchStart, { passive: false });
             taskElement.addEventListener('touchmove', handleTouchMove, { passive: false });
             taskElement.addEventListener('touchend', handleTouchEnd, { passive: false });
             taskElement.addEventListener('touchcancel', handleTouchEnd, { passive: false });
         });
 
-        // Set up drop zones
-        const dropZones = document.querySelectorAll('.task-list');
         dropZones.forEach(zone => {
             zone.addEventListener('dragover', handleDragOver);
             zone.addEventListener('dragleave', handleDragLeave);
@@ -537,8 +580,12 @@ const Tasks = (() => {
             updateGhostPosition(touch.clientX, touch.clientY, ghost);
             
             // Find drop target
-            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.task-list');
+            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('[id^="role-"], [id^="quadrant-"]');
             if (dropTarget) {
+                // Remove drag-over class from all drop zones
+                document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
                 dropTarget.classList.add('drag-over');
             }
         }
@@ -560,20 +607,27 @@ const Tasks = (() => {
         // Remove dragging classes
         taskElement.classList.remove('dragging');
         document.body.classList.remove('dragging-active');
-        document.querySelectorAll('.task-list.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
+            el.classList.remove('drag-over');
+        });
         
         // Find drop target
         const touch = e.changedTouches[0];
-        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.task-list');
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('[id^="role-"], [id^="quadrant-"]');
         
         if (dropTarget) {
             const taskId = taskElement.dataset.taskId;
-            const newQuadrant = dropTarget.dataset.quadrant;
+            const task = tasks.find(t => t.id === taskId);
             
-            // Update task
-            const taskIndex = tasks.findIndex(t => t.id === taskId);
-            if (taskIndex !== -1) {
-                tasks[taskIndex].quadrant = newQuadrant;
+            if (task) {
+                if (dropTarget.id.startsWith('role-')) {
+                    const newRole = dropTarget.id.replace('role-', '');
+                    task.role = newRole;
+                } else if (dropTarget.id.startsWith('quadrant-')) {
+                    const newQuadrant = dropTarget.id.replace('quadrant-', '');
+                    task.quadrant = newQuadrant;
+                }
+                
                 saveData();
                 updateUI();
             }
@@ -583,6 +637,33 @@ const Tasks = (() => {
         delete taskElement.dataset.dragX;
         delete taskElement.dataset.dragY;
         delete taskElement.dataset.ghost;
+    }
+
+    // Handle drop
+    function handleDrop(e) {
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('text/plain');
+        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
+        
+        if (dropZone && taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                if (dropZone.id.startsWith('role-')) {
+                    const newRole = dropZone.id.replace('role-', '');
+                    task.role = newRole;
+                } else if (dropZone.id.startsWith('quadrant-')) {
+                    const newQuadrant = dropZone.id.replace('quadrant-', '');
+                    task.quadrant = newQuadrant;
+                }
+                
+                saveData();
+                updateUI();
+            }
+        }
+        
+        document.querySelectorAll('[id^="role-"], [id^="quadrant-"]').forEach(el => {
+            el.classList.remove('drag-over');
+        });
     }
 
     // Update ghost position
@@ -625,32 +706,6 @@ const Tasks = (() => {
         if (dropZone) {
             dropZone.classList.remove('drag-over', 'bg-gray-100');
         }
-    }
-
-    // Handle drop
-    function handleDrop(e) {
-        e.preventDefault();
-        const taskId = e.dataTransfer.getData('text/plain');
-        const dropZone = e.target.closest('[id^="role-"], [id^="quadrant-"]');
-        
-        if (dropZone && taskId) {
-            const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                // Update task based on drop zone
-                if (dropZone.id.startsWith('role-')) {
-                    const newRole = dropZone.id.replace('role-', '');
-                    task.role = newRole;
-                } else if (dropZone.id.startsWith('quadrant-')) {
-                    const newQuadrant = dropZone.id.replace('quadrant-', '');
-                    task.quadrant = newQuadrant;
-                }
-                
-                saveData();
-                updateUI();
-            }
-        }
-        
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over', 'bg-gray-100'));
     }
 
     // Add a new task
@@ -883,25 +938,39 @@ const Tasks = (() => {
 
     // Update charts
     function updateCharts() {
+        if (!chartQuadrants || !chartCompletion) {
+            // If charts don't exist, reinitialize them
+            destroyCharts();
+            initCharts();
+            return;
+        }
+
         if (chartQuadrants) {
             chartQuadrants.data.datasets[0].data = countTasksByQuadrant();
-            chartQuadrants.update();
+            chartQuadrants.update('none'); // Use 'none' mode for better performance
         }
 
         if (chartCompletion) {
             chartCompletion.data.datasets[0].data = countCompletedPending();
-            chartCompletion.update();
+            chartCompletion.update('none'); // Use 'none' mode for better performance
         }
     }
 
     // Update historical charts
     function updateHistoricalCharts() {
+        if (!chartHistoricalCompletion || !chartHistoricalQuadrants || !chartHistoricalRoles) {
+            // If charts don't exist, reinitialize them
+            destroyCharts();
+            initCharts();
+            return;
+        }
+
         const historicalData = prepareHistoricalData();
 
         if (chartHistoricalCompletion) {
             chartHistoricalCompletion.data.labels = historicalData.labels;
             chartHistoricalCompletion.data.datasets[0].data = historicalData.completionPercentages;
-            chartHistoricalCompletion.update();
+            chartHistoricalCompletion.update('none'); // Use 'none' mode for better performance
         }
 
         if (chartHistoricalQuadrants) {
@@ -910,13 +979,13 @@ const Tasks = (() => {
             chartHistoricalQuadrants.data.datasets[1].data = historicalData.q2Counts;
             chartHistoricalQuadrants.data.datasets[2].data = historicalData.q3Counts;
             chartHistoricalQuadrants.data.datasets[3].data = historicalData.q4Counts;
-            chartHistoricalQuadrants.update();
+            chartHistoricalQuadrants.update('none'); // Use 'none' mode for better performance
         }
 
         if (chartHistoricalRoles) {
             chartHistoricalRoles.data.labels = historicalData.labels;
             chartHistoricalRoles.data.datasets[0].data = historicalData.activeRoles;
-            chartHistoricalRoles.update();
+            chartHistoricalRoles.update('none'); // Use 'none' mode for better performance
         }
     }
 
@@ -980,14 +1049,17 @@ const Tasks = (() => {
         deleteTask,
         saveReview,
         startNewWeek,
+        updateCharts,
         exportMetrics,
         exportTasks,
         showRoles,
-        showQuadrants
+        showQuadrants,
+        destroyCharts
     };
 })();
 
-// Initialize tasks when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    Tasks.init();
-}); 
+// Make Tasks available globally
+window.Tasks = Tasks;
+
+// Remove any automatic initialization
+// The initialization will be handled by the main initApp function 

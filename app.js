@@ -90,15 +90,17 @@ const App = (() => {
         // Notifications
         window.addEventListener('showNotification', handleNotification);
 
-        // Service worker registration
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
+        // Service worker registration - only if running on http/https
+        if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+            navigator.serviceWorker.register('./service-worker.js')
                 .then(registration => {
                     console.log('ServiceWorker registration successful');
                 })
                 .catch(error => {
-                    console.error('ServiceWorker registration failed:', error);
+                    console.log('ServiceWorker registration not available (running locally)');
                 });
+        } else {
+            console.log('ServiceWorker not available (running locally)');
         }
     }
 
@@ -198,15 +200,14 @@ const App = (() => {
     // Public API
     return {
         init,
+        showNotification,
         toggleTheme,
-        toggleInstructions,
-        showNotification
+        toggleInstructions
     };
 })();
 
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    App.init().catch(error => {
-        console.error('Failed to initialize application:', error);
-    });
-}); 
+// Make App available globally
+window.App = App;
+
+// Remove automatic initialization from App module
+// The initialization will be handled by the main initApp function 

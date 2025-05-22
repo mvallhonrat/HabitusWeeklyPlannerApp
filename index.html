@@ -146,12 +146,6 @@
 <link rel="stylesheet" href="styles.css">
 <link href="./icons/icon-192x192.png" rel="icon" type="image/png"/></head>
 <body class="bg-gray-50 text-gray-800 p-4 antialiased ios-standalone">
-<div class="absolute top-4 right-4 text-sm text-gray-600" id="langSelector">
-    <div class="lang-switch" id="langSwitch">
-        <span class="lang-switch-text es">ES</span>
-        <span class="lang-switch-text en">EN</span>
-    </div>
-</div>
 <!-- Título principal -->
 <!-- Recuadro de instrucciones - Colapsable en móvil -->
 <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-900 p-3 mb-4 rounded">
@@ -330,14 +324,148 @@
 <div id="translations-data" style="display: none;"></div>
 <div id="passages-data" style="display: none;"></div>
 
-<!-- Load scripts in correct order with defer -->
-<script src="pasajes_bilingues.js" defer></script>
-<script src="translations.js" defer></script>
-<script src="roles.js" defer></script>
-<script src="tasks.js" defer></script>
-<script src="app.js" defer></script>
-
+<!-- Load scripts in correct order -->
 <script>
+// Define global namespace for modules
+window.Habitus = window.Habitus || {};
+
+// Helper function to determine if running on a web server
+function isWebServer() {
+    return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+}
+
+// Helper function to get correct script path
+function getScriptPath(path) {
+    // If running on web server, use absolute path from root
+    // If running locally, use relative path
+    return isWebServer() ? path : path.replace(/^\//, './');
+}
+
+// Load scripts dynamically to ensure proper order
+async function loadScripts() {
+    const scripts = [
+        'translations.js',
+        'roles.js',
+        'tasks.js',
+        'app.js'
+    ];
+
+    for (const script of scripts) {
+        await new Promise((resolve, reject) => {
+            const scriptElement = document.createElement('script');
+            scriptElement.src = getScriptPath(script);
+            scriptElement.onload = resolve;
+            scriptElement.onerror = reject;
+            document.body.appendChild(scriptElement);
+        });
+    }
+}
+
+// Migration function to handle data from previous versions
+async function migrateData() {
+    try {
+        console.log('Starting data migration...');
+        
+        // Get all localStorage keys
+        const keys = Object.keys(localStorage);
+        const migrationLog = [];
+        
+        // Migrate roles
+        const oldRoles = localStorage.getItem('roles');
+        if (oldRoles) {
+            try {
+                const roles = JSON.parse(oldRoles);
+                if (Array.isArray(roles)) {
+                    localStorage.setItem('habitus_roles', JSON.stringify(roles));
+                    localStorage.removeItem('roles');
+                    migrationLog.push('Roles migrated successfully');
+                }
+            } catch (e) {
+                console.error('Error migrating roles:', e);
+            }
+        }
+        
+        // Migrate tasks
+        const oldTasks = localStorage.getItem('tasks');
+        if (oldTasks) {
+            try {
+                const tasks = JSON.parse(oldTasks);
+                if (Array.isArray(tasks)) {
+                    // Update task format if needed
+                    const updatedTasks = tasks.map(task => ({
+                        ...task,
+                        id: task.id || Date.now().toString(),
+                        createdAt: task.createdAt || new Date().toISOString()
+                    }));
+                    localStorage.setItem('habitus_tasks', JSON.stringify(updatedTasks));
+                    localStorage.removeItem('tasks');
+                    migrationLog.push('Tasks migrated successfully');
+                }
+            } catch (e) {
+                console.error('Error migrating tasks:', e);
+            }
+        }
+        
+        // Migrate metrics
+        const oldMetrics = localStorage.getItem('metrics');
+        if (oldMetrics) {
+            try {
+                const metrics = JSON.parse(oldMetrics);
+                if (Array.isArray(metrics)) {
+                    localStorage.setItem('habitus_metrics', JSON.stringify(metrics));
+                    localStorage.removeItem('metrics');
+                    migrationLog.push('Metrics migrated successfully');
+                }
+            } catch (e) {
+                console.error('Error migrating metrics:', e);
+            }
+        }
+        
+        // Migrate task log
+        const oldTasksLog = localStorage.getItem('tasksLog');
+        if (oldTasksLog) {
+            try {
+                const tasksLog = JSON.parse(oldTasksLog);
+                if (Array.isArray(tasksLog)) {
+                    localStorage.setItem('habitus_tasksLog', JSON.stringify(tasksLog));
+                    localStorage.removeItem('tasksLog');
+                    migrationLog.push('Task log migrated successfully');
+                }
+            } catch (e) {
+                console.error('Error migrating task log:', e);
+            }
+        }
+        
+        // Migrate review
+        const oldReview = localStorage.getItem('lastReview');
+        if (oldReview) {
+            try {
+                localStorage.setItem('habitus_lastReview', oldReview);
+                localStorage.removeItem('lastReview');
+                migrationLog.push('Review migrated successfully');
+            } catch (e) {
+                console.error('Error migrating review:', e);
+            }
+        }
+        
+        // Show migration results
+        if (migrationLog.length > 0) {
+            App.showNotification('Data migration completed successfully', 'success');
+            console.log('Migration log:', migrationLog);
+            
+            // Refresh the page to apply migrated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            App.showNotification('No data to migrate found', 'info');
+        }
+    } catch (error) {
+        console.error('Error during data migration:', error);
+        App.showNotification('Error during data migration. Please check the console for details.', 'error');
+    }
+}
+
 // Global error handler
 window.onerror = function(msg, url, lineNo, columnNo, error) {
     console.error('Global error:', { msg, url, lineNo, columnNo, error });
@@ -349,102 +477,150 @@ async function initApp() {
     try {
         console.log('Starting application initialization...');
         
+        // Load scripts first
+        await loadScripts();
+        
         // Wait for all scripts to load
-        await Promise.all([
-            new Promise(resolve => {
-                if (document.readyState === 'complete') resolve();
-                else window.addEventListener('load', resolve);
-            }),
-            // Ensure pasajes_bilingues.js is loaded
-            new Promise(resolve => {
-                if (window.PASAJES_BILINGUES) resolve();
-                else {
-                    const checkInterval = setInterval(() => {
-                        if (window.PASAJES_BILINGUES) {
-                            clearInterval(checkInterval);
-                            resolve();
-                        }
-                    }, 100);
-                }
-            })
-        ]);
+        await new Promise(resolve => {
+            if (document.readyState === 'complete') {
+                resolve();
+            } else {
+                window.addEventListener('load', resolve);
+            }
+        });
         
-        // Initialize App module
-        await App.init();
+        // Verify all required modules are available
+        const requiredModules = {
+            'Translations': window.Translations,
+            'Roles': window.Roles,
+            'Tasks': window.Tasks,
+            'App': window.App
+        };
         
-        // Set up export buttons
-        document.getElementById('exportMetricsBtn')?.addEventListener('click', Tasks.exportMetrics);
-        document.getElementById('exportTasksBtn')?.addEventListener('click', Tasks.exportTasks);
+        // Log the state of each module
+        console.log('Module status:', {
+            Translations: !!window.Translations,
+            Roles: !!window.Roles,
+            Tasks: !!window.Tasks,
+            App: !!window.App
+        });
         
-        // Set up migration button
-        document.getElementById('migrateDataBtn')?.addEventListener('click', migrateData);
+        const missingModules = Object.entries(requiredModules)
+            .filter(([_, module]) => !module)
+            .map(([name]) => name);
+            
+        if (missingModules.length > 0) {
+            throw new Error(`Missing required modules: ${missingModules.join(', ')}`);
+        }
+        
+        console.log('All required modules loaded, starting initialization...');
+        
+        // Initialize modules in correct order with proper error handling
+        try {
+            // Initialize Translations first
+            if (typeof Translations !== 'undefined') {
+                console.log('Initializing Translations module...');
+                await Translations.init();
+                console.log('Translations module initialized');
+            } else {
+                throw new Error('Translations module not found');
+            }
+            
+            // Initialize Roles
+            if (typeof Roles !== 'undefined') {
+                console.log('Initializing Roles module...');
+                await Roles.init();
+                console.log('Roles module initialized');
+            } else {
+                throw new Error('Roles module not found');
+            }
+            
+            // Initialize Tasks
+            if (typeof Tasks !== 'undefined') {
+                console.log('Initializing Tasks module...');
+                await Tasks.init();
+                console.log('Tasks module initialized');
+            } else {
+                throw new Error('Tasks module not found');
+            }
+            
+            // Initialize App
+            if (typeof App !== 'undefined') {
+                console.log('Initializing App module...');
+                await App.init();
+                console.log('App module initialized');
+            } else {
+                throw new Error('App module not found');
+            }
+        } catch (initError) {
+            console.error('Error during module initialization:', initError);
+            throw initError;
+        }
+        
+        // Set up event listeners
+        try {
+            console.log('Setting up event listeners...');
+            document.getElementById('exportMetricsBtn')?.addEventListener('click', Tasks.exportMetrics);
+            document.getElementById('exportTasksBtn')?.addEventListener('click', Tasks.exportTasks);
+            document.getElementById('migrateDataBtn')?.addEventListener('click', migrateData);
+            console.log('Event listeners set up successfully');
+        } catch (eventError) {
+            console.error('Error setting up event listeners:', eventError);
+            throw eventError;
+        }
         
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Error initializing application:', error);
+        // Show detailed error to user
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'fixed top-0 left-0 right-0 bg-red-500 text-white p-4 text-center z-50';
+        errorMessage.innerHTML = `
+            <p class="font-bold">Error initializing application</p>
+            <p class="text-sm mt-1">${error.message}</p>
+            <p class="text-sm mt-1">Please check the console for details and refresh the page.</p>
+        `;
+        document.body.appendChild(errorMessage);
+        
+        // Log additional debugging information
+        console.log('Current window state:', {
+            Translations: !!window.Translations,
+            Roles: !!window.Roles,
+            Tasks: !!window.Tasks,
+            App: !!window.App,
+            documentReadyState: document.readyState,
+            scriptsLoaded: Array.from(document.scripts).map(s => s.src),
+            protocol: window.location.protocol,
+            host: window.location.host
+        });
     }
 }
 
-// Data migration function
-async function migrateData() {
-    try {
-        // Get old data
-        const oldTasks = JSON.parse(localStorage.getItem('habitus_tasks') || '[]');
-        const oldMetrics = JSON.parse(localStorage.getItem('habitus_metrics') || '[]');
-        const oldTasksLog = JSON.parse(localStorage.getItem('habitus_tasksLog') || '[]');
-        const oldLastReview = localStorage.getItem('habitus_lastReview') || '';
-        const oldLastReset = localStorage.getItem('habitus_lastReset');
-        const oldRoles = JSON.parse(localStorage.getItem('habitus_roles') || '[]');
-        
-        // Backup old data
-        localStorage.setItem('habitus_tasks_backup', JSON.stringify(oldTasks));
-        localStorage.setItem('habitus_metrics_backup', JSON.stringify(oldMetrics));
-        localStorage.setItem('habitus_tasksLog_backup', JSON.stringify(oldTasksLog));
-        localStorage.setItem('habitus_lastReview_backup', oldLastReview);
-        localStorage.setItem('habitus_lastReset_backup', oldLastReset || '');
-        localStorage.setItem('habitus_roles_backup', JSON.stringify(oldRoles));
-        
-        // Migrate tasks to new format
-        const newTasks = oldTasks.map(task => ({
-            ...task,
-            quadrant: task.quadrant?.toString() || '1', // Ensure quadrant is a string
-            role: task.role || 'Default', // Ensure role exists
-            completed: Boolean(task.completed), // Ensure completed is boolean
-            createdAt: task.createdAt || new Date().toISOString() // Ensure createdAt exists
-        }));
-        
-        // Save new data
-        localStorage.setItem('habitus_tasks', JSON.stringify(newTasks));
-        localStorage.setItem('habitus_metrics', JSON.stringify(oldMetrics));
-        localStorage.setItem('habitus_tasksLog', JSON.stringify(oldTasksLog));
-        localStorage.setItem('habitus_lastReview', oldLastReview);
-        localStorage.setItem('habitus_lastReset', oldLastReset || '');
-        localStorage.setItem('habitus_roles', JSON.stringify(oldRoles));
-        
-        // Refresh the UI
-        window.location.reload();
-        
-        App.showNotification('Data migration completed successfully', 'success');
-    } catch (error) {
-        console.error('Error during data migration:', error);
-        App.showNotification('Error during data migration', 'error');
-    }
-}
-
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', initApp);
-
-// Register service worker
-if ('serviceWorker' in navigator) {
+// Register service worker if running on web server
+if (isWebServer()) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('./service-worker.js', {
+            const registration = await navigator.serviceWorker.register(getScriptPath('service-worker.js'), {
                 scope: './'
             });
             console.log('ServiceWorker registration successful:', registration);
         } catch (err) {
-            console.error('ServiceWorker registration failed:', err);
+            console.log('ServiceWorker registration failed:', err);
         }
     });
+} else {
+    console.log('ServiceWorker not available (running locally)');
+}
+
+// Wait for DOM to be ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, starting initialization...');
+        initApp();
+    });
+} else {
+    console.log('DOM already loaded, starting initialization...');
+    initApp();
 }
 </script>
+
