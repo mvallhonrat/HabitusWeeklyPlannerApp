@@ -224,32 +224,61 @@ const Tasks = (() => {
         }
     }
 
-    // Add this function after loadData and before saveData
+    // Update the migrateMetricsData function to be more robust
     function migrateMetricsData() {
         if (!metrics || !Array.isArray(metrics)) return;
         
+        console.log('Original metrics:', metrics); // Debug log
+        
         let needsMigration = false;
         const migratedMetrics = metrics.map(metric => {
-            // Check if timestamp is a string date
-            if (typeof metric.timestamp === 'string' && !metric.timestamp.match(/^\d+$/)) {
+            let newTimestamp;
+            
+            // Debug log for each metric
+            console.log('Processing metric:', metric);
+            console.log('Timestamp type:', typeof metric.timestamp);
+            console.log('Timestamp value:', metric.timestamp);
+            
+            if (metric.timestamp === undefined || metric.timestamp === null) {
                 needsMigration = true;
-                return {
-                    ...metric,
-                    timestamp: new Date(metric.timestamp).getTime()
-                };
-            }
-            // Check if timestamp is a number but in wrong format
-            if (typeof metric.timestamp === 'number' && metric.timestamp < 1000000000000) {
+                newTimestamp = Date.now();
+            } else if (typeof metric.timestamp === 'string') {
+                // Try parsing the string date
+                const parsedDate = new Date(metric.timestamp);
+                if (isNaN(parsedDate.getTime())) {
+                    // If it's not a valid date string, try parsing as a number
+                    const numTimestamp = parseInt(metric.timestamp);
+                    if (!isNaN(numTimestamp)) {
+                        needsMigration = true;
+                        newTimestamp = numTimestamp < 1000000000000 ? numTimestamp * 1000 : numTimestamp;
+                    } else {
+                        // If all parsing fails, use current time
+                        needsMigration = true;
+                        newTimestamp = Date.now();
+                    }
+                } else {
+                    needsMigration = true;
+                    newTimestamp = parsedDate.getTime();
+                }
+            } else if (typeof metric.timestamp === 'number') {
                 needsMigration = true;
-                return {
-                    ...metric,
-                    timestamp: metric.timestamp * 1000 // Convert seconds to milliseconds if needed
-                };
+                newTimestamp = metric.timestamp < 1000000000000 ? metric.timestamp * 1000 : metric.timestamp;
+            } else {
+                // Fallback to current time for any other case
+                needsMigration = true;
+                newTimestamp = Date.now();
             }
-            return metric;
+            
+            console.log('New timestamp:', newTimestamp); // Debug log
+            
+            return {
+                ...metric,
+                timestamp: newTimestamp
+            };
         });
 
         if (needsMigration) {
+            console.log('Migrated metrics:', migratedMetrics); // Debug log
             metrics = migratedMetrics;
             saveData();
             App.showNotification(Translations.getTranslation('notifications.data_migrated'), 'success');
@@ -918,12 +947,33 @@ const Tasks = (() => {
         // Ensure metrics are migrated
         migrateMetricsData();
         
+        console.log('Preparing historical data with metrics:', metrics); // Debug log
+        
         const labels = metrics.map(m => {
-            const timestamp = typeof m.timestamp === 'string' ? 
-                new Date(m.timestamp).getTime() : 
-                m.timestamp;
-            return new Date(timestamp).toLocaleDateString();
+            try {
+                const timestamp = typeof m.timestamp === 'string' ? 
+                    parseInt(m.timestamp) : 
+                    m.timestamp;
+                
+                if (isNaN(timestamp)) {
+                    console.error('Invalid timestamp:', m.timestamp);
+                    return 'Invalid Date';
+                }
+                
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) {
+                    console.error('Invalid date from timestamp:', timestamp);
+                    return 'Invalid Date';
+                }
+                
+                return date.toLocaleDateString();
+            } catch (error) {
+                console.error('Error processing date:', error);
+                return 'Invalid Date';
+            }
         });
+        
+        console.log('Generated labels:', labels); // Debug log
         
         const completionPercentages = metrics.map(m => 
             m.totalTasks > 0 ? Math.round((m.completedTasks / m.totalTasks) * 100) : 0
@@ -1091,6 +1141,22 @@ const Tasks = (() => {
         document.body.removeChild(link);
     }
 
+    // Add a function to manually trigger migration and debug
+    function debugMetricsData() {
+        console.log('Current metrics data:', metrics);
+        console.log('Metrics data type:', typeof metrics);
+        console.log('Is array:', Array.isArray(metrics));
+        if (Array.isArray(metrics)) {
+            metrics.forEach((m, i) => {
+                console.log(`Metric ${i}:`, m);
+                console.log(`Timestamp ${i}:`, m.timestamp);
+                console.log(`Timestamp type ${i}:`, typeof m.timestamp);
+            });
+        }
+        migrateMetricsData();
+        console.log('Migrated metrics data:', metrics);
+    }
+
     // Public API
     return {
         init,
@@ -1109,7 +1175,8 @@ const Tasks = (() => {
         saveData,
         updateUI,
         initDragAndDrop,
-        migrateMetricsData
+        migrateMetricsData,
+        debugMetricsData  // Add debug function to public API
     };
 })();
 

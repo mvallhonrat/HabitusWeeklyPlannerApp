@@ -276,4 +276,14 @@ body.dragging {
     overflow: hidden;
     touch-action: none;
     overscroll-behavior: none;
+}
+
+/* Make checkboxes smaller on mobile */
+@media (max-width: 768px) {
+    .task-item input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        min-width: 16px;
+        margin-right: 8px;
+    }
 } 
