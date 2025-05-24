@@ -2,20 +2,21 @@
     "name": "Habitus - Planificador Semanal",
     "short_name": "Habitus",
     "description": "Organiza tu semana con claridad y propósito con Habitus.",
-    "start_url": "/",
+    "start_url": "/HabitusWeeklyPlannerApp/",
+    "scope": "/HabitusWeeklyPlannerApp/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#4f46e5",
     "orientation": "portrait",
     "icons": [
         {
-            "src": "icons/icon-192x192.png",
+            "src": "/HabitusWeeklyPlannerApp/icons/icon-192x192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "icons/icon-512x512.png",
+            "src": "/HabitusWeeklyPlannerApp/icons/icon-512x512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
@@ -26,20 +27,20 @@
             "name": "Nueva Tarea",
             "short_name": "Nueva Tarea",
             "description": "Agregar una nueva tarea",
-            "url": "/?action=new-task",
-            "icons": [{ "src": "icons/icon-192x192.png", "sizes": "192x192" }]
+            "url": "/HabitusWeeklyPlannerApp/?action=new-task",
+            "icons": [{ "src": "/HabitusWeeklyPlannerApp/icons/icon-192x192.png", "sizes": "192x192" }]
         },
         {
             "name": "Ver Métricas",
             "short_name": "Métricas",
             "description": "Ver métricas semanales",
-            "url": "/?action=metrics",
-            "icons": [{ "src": "icons/icon-192x192.png", "sizes": "192x192" }]
+            "url": "/HabitusWeeklyPlannerApp/?action=metrics",
+            "icons": [{ "src": "/HabitusWeeklyPlannerApp/icons/icon-192x192.png", "sizes": "192x192" }]
         }
     ],
     "screenshots": [
         {
-            "src": "icons/screenshot1.png",
+            "src": "/HabitusWeeklyPlannerApp/icons/screenshot1.png",
             "sizes": "1280x720",
             "type": "image/png",
             "platform": "wide",

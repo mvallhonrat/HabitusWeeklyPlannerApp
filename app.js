@@ -89,19 +89,6 @@ const App = (() => {
 
         // Notifications
         window.addEventListener('showNotification', handleNotification);
-
-        // Service worker registration - only if running on http/https
-        if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
-            navigator.serviceWorker.register('./service-worker.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful');
-                })
-                .catch(error => {
-                    console.log('ServiceWorker registration not available (running locally)');
-                });
-        } else {
-            console.log('ServiceWorker not available (running locally)');
-        }
     }
 
     // Load theme preference
